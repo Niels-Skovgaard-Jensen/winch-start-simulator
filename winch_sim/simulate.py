@@ -41,6 +41,19 @@ def _ev_rope_in(t, y, args, **kw):
     return 30.0 - y.L0
 
 
+def launch_event() -> dfx.Event:
+    """End-of-launch events (see EVENTS), located exactly by root finding."""
+    return dfx.Event(
+        cond_fn=[_ev_release, _ev_back_release, _ev_weak_link, _ev_rope_in],
+        root_finder=optx.Newton(rtol=1e-8, atol=1e-8),
+        direction=True,
+    )
+
+
+def step_controller(rtol: float, atol: float) -> dfx.PIDController:
+    return dfx.PIDController(rtol=rtol, atol=atol, pcoeff=0.3, icoeff=0.4)
+
+
 def _solver(name: str):
     if name == "tsit5":
         return dfx.Tsit5()
@@ -75,13 +88,9 @@ def solve_launch(
     args = make_args(launch, attached=1.0)
     y0 = initial_state(args, n_segments)
     term = dfx.ODETerm(vector_field)
-    controller = dfx.PIDController(rtol=rtol, atol=atol, pcoeff=0.3, icoeff=0.4)
+    controller = step_controller(rtol, atol)
     ts = jnp.arange(0.0, t_max, dt_save)
-    event = dfx.Event(
-        cond_fn=[_ev_release, _ev_back_release, _ev_weak_link, _ev_rope_in],
-        root_finder=optx.Newton(rtol=1e-8, atol=1e-8),
-        direction=True,
-    )
+    event = launch_event()
     sol = dfx.diffeqsolve(
         term,
         _solver(solver),
@@ -158,6 +167,8 @@ def summarize(launch: Launch, sol: LaunchSolution) -> dict[str, float | str]:
         "min_V_air_kmh": float(d["V"][airborne].min() * 3.6) if airborne.any() else 0.0,
         "max_T_hook": float(d["T_hook"].max()),
         "max_T_winch": float(d["T_winch"].max()),
+        "rope_safety_factor": float(launch.rope.breaking_load)
+        / float(d["T_max_rope"].max()),
         "max_n": float(d["n_wing"][airborne].max()) if airborne.any() else 0.0,
         "max_power_kW": float(d["winch_power"].max() / 1e3),
         "rope_used": float(d["L0"][0] - d["L0"][-1]),

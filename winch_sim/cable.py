@@ -7,6 +7,7 @@ shrinks every segment's rest length and node mass uniformly, which keeps the num
 states fixed (needed for JAX / diffrax).
 """
 
+import dataclasses
 from typing import NamedTuple
 
 import jax.numpy as jnp
@@ -18,33 +19,92 @@ from .ground import contact_force
 from .params import Env, Rope
 from .smooth import safe_norm, softplus
 
-STEEL = Rope(
-    diameter=4.5e-3,
-    mu=0.080,
-    EA=1.0e6,
-    zeta=0.2,
-    CDn=1.2,
+
+def rope_from_datasheet(
+    *,
+    diameter_mm: float,
+    mass_kg_per_100m: float,
+    breaking_load_kN: float,
+    elongation_at_break_pct: float | None = None,
+    EA_N: float | None = None,
+    CDn: float = 1.2,
+    Cf: float = 0.01,
+    ground_mu: float = 0.4,
+    zeta: float = 0.2,
+    end_mass_kg: float = 8.0,
+    end_CdA_m2: float = 0.1,
+    ground_sink: float = 0.02,
+) -> Rope:
+    """Rope from manufacturer datasheet values.
+
+    Axial stiffness either given directly (EA_N) or from the elongation at break,
+    assuming a linear load-elongation curve: EA = breaking load / strain at break.
+    (Synthetic ropes are stiffer at working loads than this secant value suggests;
+    give EA_N from the datasheet's load-elongation curve at ~20-30 % of the breaking
+    load when you have it.)
+    """
+    if EA_N is None:
+        if elongation_at_break_pct is None:
+            raise ValueError("give either EA_N or elongation_at_break_pct")
+        EA_N = breaking_load_kN * 1e3 / (elongation_at_break_pct / 100.0)
+    return Rope(
+        diameter=diameter_mm * 1e-3,
+        mu=mass_kg_per_100m / 100.0,
+        EA=EA_N,
+        breaking_load=breaking_load_kN * 1e3,
+        zeta=zeta,
+        CDn=CDn,
+        Cf=Cf,
+        ground_mu=ground_mu,
+        ground_sink=ground_sink,
+        end_mass=end_mass_kg,
+        end_CdA=end_CdA_m2,
+    )
+
+
+# Generic presets (approximate, typical values; not a specific product).
+STEEL = rope_from_datasheet(
+    diameter_mm=4.5,
+    mass_kg_per_100m=8.0,
+    breaking_load_kN=17.0,
+    EA_N=1.0e6,
     Cf=0.02,
     ground_mu=0.5,
-    ground_sink=0.02,
-    end_mass=8.0,
-    end_CdA=0.1,
 )
-
-DYNEEMA = Rope(
-    diameter=5.0e-3,
-    mu=0.016,
-    EA=6.0e5,
-    zeta=0.2,
-    CDn=1.2,
-    Cf=0.01,
-    ground_mu=0.4,
-    ground_sink=0.02,
-    end_mass=8.0,
-    end_CdA=0.1,
+DYNEEMA = rope_from_datasheet(
+    diameter_mm=5.0,
+    mass_kg_per_100m=1.6,
+    breaking_load_kN=27.0,
+    EA_N=6.0e5,
 )
 
 ROPES = {"steel": STEEL, "dyneema": DYNEEMA}
+
+
+def load_rope(path) -> Rope:
+    """Read a rope from a TOML file.
+
+    Either datasheet keys (see `rope_from_datasheet`, e.g. diameter_mm,
+    mass_kg_per_100m, breaking_load_kN, elongation_at_break_pct / EA_N, ...) or,
+    with `base = "steel"|"dyneema"`, SI overrides of `Rope` fields on a preset
+    (diameter, mu, EA, breaking_load, zeta, CDn, Cf, ground_mu, ...).
+    """
+    import tomllib
+
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    data.pop("name", None)
+    if "base" in data:
+        return override_rope(ROPES[data.pop("base")], data)
+    return rope_from_datasheet(**data)
+
+
+def override_rope(rope: Rope, values: dict) -> Rope:
+    """Replace `Rope` fields (SI units) by name."""
+    unknown = set(values) - set(Rope.__dataclass_fields__)
+    if unknown:
+        raise ValueError(f"unknown rope fields: {sorted(unknown)}")
+    return dataclasses.replace(rope, **{k: float(v) for k, v in values.items()})
 
 
 class RopeForces(NamedTuple):

@@ -11,66 +11,78 @@ Conventions (see docs/physics.md):
   * SI units throughout (m, s, kg, N, rad)
 """
 
+import dataclasses
+
 import equinox as eqx
 from jax import Array
+
+
+def unit(u: str, default=dataclasses.MISSING):
+    """Dataclass field carrying its physical unit as metadata ('-' = dimensionless)."""
+    return eqx.field(default=default, metadata={"unit": u})
 
 
 class Glider(eqx.Module):
     """Longitudinal rigid-body and aerodynamic model of a glider."""
 
-    mass: float | Array  # launch mass [kg]
-    S: float | Array  # wing area [m^2]
-    chord: float | Array  # mean aerodynamic chord [m]
-    I_yy: float | Array  # pitch moment of inertia about the CG [kg m^2]
+    mass: float | Array = unit("kg")  # launch mass
+    S: float | Array = unit("m^2")  # wing area
+    chord: float | Array = unit("m")  # mean aerodynamic chord
+    I_yy: float | Array = unit("kg m^2")  # pitch moment of inertia about the CG
 
     # Lift: C_L = CL0 + CLa*alpha + CLde*de + CLq*q_hat, softly limited to [CLmin, CLmax]
-    CL0: float | Array
-    CLa: float | Array
-    CLde: float | Array
-    CLq: float | Array
-    CLmax: float | Array
-    CLmin: float | Array
+    CL0: float | Array = unit("-")
+    CLa: float | Array = unit("1/rad")
+    CLde: float | Array = unit("1/rad")
+    CLq: float | Array = unit("-")
+    CLmax: float | Array = unit("-")
+    CLmin: float | Array = unit("-")
 
     # Drag polar: C_D = CD0 + k_ind*C_L^2 (+ post-stall drag)
-    CD0: float | Array
-    k_ind: float | Array
+    CD0: float | Array = unit("-")
+    k_ind: float | Array = unit("-")
 
     # Pitching moment about the CG: C_m = Cm0 + Cma*alpha + Cmq*q_hat + Cmde*de
-    Cm0: float | Array
-    Cma: float | Array
-    Cmq: float | Array
-    Cmde: float | Array
+    Cm0: float | Array = unit("-")
+    Cma: float | Array = unit("1/rad")
+    Cmq: float | Array = unit("-")
+    Cmde: float | Array = unit("1/rad")
 
     # Tow hook (winch / CG hook) position relative to the CG, body frame [m]
-    hook_x: float | Array
-    hook_z: float | Array
+    hook_x: float | Array = unit("m")
+    hook_z: float | Array = unit("m")
 
     # Ground contact points (nose skid, main wheel, tail wheel/skid), body frame
-    contact_x: Array  # shape (3,)
-    contact_z: Array  # shape (3,)
-    contact_k: Array  # spring stiffness [N/m]
-    contact_c: Array  # damping [N s/m]
-    contact_mu: Array  # friction coefficient
+    contact_x: Array = unit("m")  # shape (3,)
+    contact_z: Array = unit("m")  # shape (3,)
+    contact_k: Array = unit("N/m")  # spring stiffness
+    contact_c: Array = unit("N s/m")  # damping
+    contact_mu: Array = unit("-")  # friction coefficient
 
     # Operating limits
-    V_W: float | Array  # max winch-launch airspeed [m/s]
-    weak_link: float | Array  # weak link breaking load [N]
+    V_W: float | Array = unit("m/s")  # max winch-launch airspeed
+    weak_link: float | Array = unit("N")  # weak link breaking load
 
 
 class Rope(eqx.Module):
     """Winch cable: lumped-mass elastic rope with weight and aerodynamic drag."""
 
-    diameter: float | Array  # [m]
-    mu: float | Array  # mass per unit length [kg/m]
-    EA: float | Array  # axial stiffness [N]
-    zeta: float | Array  # internal damping ratio of a single segment's axial mode
-    CDn: float | Array  # normal (cross-flow) drag coefficient
-    Cf: float | Array  # tangential skin-friction coefficient
-    ground_mu: float | Array  # rope-on-grass friction coefficient
-    ground_sink: float | Array  # static penetration used for the ground spring [m]
+    diameter: float | Array = unit("m")
+    mu: float | Array = unit("kg/m")  # mass per unit length
+    EA: float | Array = unit("N")  # axial stiffness
+    breaking_load: float | Array = unit("N")  # minimum breaking load
+    zeta: float | Array = unit("-")  # damping ratio of one segment's axial mode
+    CDn: float | Array = unit("-")  # normal (cross-flow) drag coefficient
+    Cf: float | Array = unit("-")  # tangential skin-friction coefficient
+    ground_mu: float | Array = unit("-")  # rope-on-grass friction coefficient
+    ground_sink: float | Array = unit(
+        "m"
+    )  # static penetration used for the ground spring
     # Rope end at the glider: drogue parachute + strop + weak link assembly
-    end_mass: float | Array  # [kg]
-    end_CdA: float | Array  # drag area of the (trailing, closed) parachute [m^2]
+    end_mass: float | Array = unit("kg")
+    end_CdA: float | Array = unit(
+        "m^2"
+    )  # drag area of the (trailing, closed) parachute
 
 
 class Winch(eqx.Module):
@@ -82,48 +94,60 @@ class Winch(eqx.Module):
     power-limited engine curve.  The pull is scaled by the driver's throttle schedule.
     """
 
-    F_max: float | Array  # max pull at low speed (torque limit / drum radius) [N]
-    P_max: float | Array  # max power at the drum [W]
-    throttle: float | Array  # driver's throttle setting (0..1)
-    M_eff: float | Array  # effective mass of drum + drivetrain at the rope [kg]
-    b_fric: float | Array  # viscous drum loss [N s/m]
-    t_start: float | Array  # time the driver starts to pull [s]
-    t_ramp: float | Array  # duration of the throttle ramp-up [s]
+    F_max: float | Array = unit(
+        "N"
+    )  # max pull at low speed (torque limit / drum radius)
+    P_max: float | Array = unit("W")  # max power at the drum
+    throttle: float | Array = unit("-")  # driver's throttle setting (0..1)
+    M_eff: float | Array = unit("kg")  # effective mass of drum + drivetrain at the rope
+    b_fric: float | Array = unit("N s/m")  # viscous drum loss
+    t_start: float | Array = unit("s")  # time the driver starts to pull
+    t_ramp: float | Array = unit("s")  # duration of the throttle ramp-up
     # Near the top, the driver reduces power as the glider elevation (seen from the
     # winch) goes from fade_beta0 to fade_beta1, down to fade_floor * full power.
-    fade_beta0: float | Array
-    fade_beta1: float | Array
-    fade_floor: float | Array
-    height: float | Array  # height of the drum / rope exit [m]
+    fade_beta0: float | Array = unit("rad")
+    fade_beta1: float | Array = unit("rad")
+    fade_floor: float | Array = unit("-")
+    height: float | Array = unit("m")  # height of the drum / rope exit
 
 
 class Pilot(eqx.Module):
     """Pilot model: pitch-attitude PID with a height/elevation dependent reference."""
 
-    theta_climb: float | Array  # full-climb pitch attitude [rad]
-    theta_liftoff: float | Array  # back-stick on the ground roll: attitude above rest
-    h_rot0: float | Array  # height at which rotation into the climb starts [m]
-    h_rot1: float | Array  # height at which full climb attitude is reached [m]
-    V_target: float | Array  # target climb airspeed [m/s]
-    K_V: float | Array  # attitude trim per airspeed error [rad/(m/s)]
-    theta_top: float | Array  # attitude the pilot lowers the nose to at the top [rad]
-    top_beta0: float | Array  # glider elevation where lowering the nose starts [rad]
-    top_beta1: float | Array  # ... and where it is complete [rad]
-    theta_glide: float | Array  # attitude after release [rad]
-    Kp: float | Array  # elevator per attitude error [rad/rad]
-    Ki: float | Array  # [rad/(rad s)]
-    Kd: float | Array  # elevator per pitch rate [rad/(rad/s)]
-    tau: float | Array  # pilot/stick lag [s]
-    de_max: float | Array  # elevator deflection limit [rad]
-    release_angle: float | Array  # pilot releases at this local cable angle [rad]
-    back_release_angle: float | Array  # hook back-release (cable vs. body x) [rad]
+    theta_climb: float | Array = unit("rad")  # full-climb pitch attitude
+    theta_liftoff: float | Array = unit(
+        "rad"
+    )  # back-stick on the ground roll: attitude above rest
+    h_rot0: float | Array = unit("m")  # height at which rotation into the climb starts
+    h_rot1: float | Array = unit("m")  # height at which full climb attitude is reached
+    V_target: float | Array = unit("m/s")  # target climb airspeed
+    K_V: float | Array = unit("rad s/m")  # attitude trim per airspeed error
+    theta_top: float | Array = unit(
+        "rad"
+    )  # attitude the pilot lowers the nose to at the top
+    top_beta0: float | Array = unit(
+        "rad"
+    )  # glider elevation where lowering the nose starts
+    top_beta1: float | Array = unit("rad")  # ... and where it is complete
+    theta_glide: float | Array = unit("rad")  # attitude after release
+    Kp: float | Array = unit("-")  # elevator per attitude error
+    Ki: float | Array = unit("1/s")
+    Kd: float | Array = unit("s")  # elevator per pitch rate
+    tau: float | Array = unit("s")  # pilot/stick lag
+    de_max: float | Array = unit("rad")  # elevator deflection limit
+    release_angle: float | Array = unit(
+        "rad"
+    )  # pilot releases at this local cable angle
+    back_release_angle: float | Array = unit(
+        "rad"
+    )  # hook back-release (cable vs. body x)
 
 
 class Env(eqx.Module):
-    rho: float | Array = 1.225  # air density [kg/m^3]
-    g: float | Array = 9.81  # [m/s^2]
-    wind_ref: float | Array = 0.0  # headwind at 10 m height [m/s]
-    wind_exp: float | Array = 1.0 / 7.0  # power-law shear exponent
+    rho: float | Array = unit("kg/m^3", 1.225)  # air density
+    g: float | Array = unit("m/s^2", 9.81)
+    wind_ref: float | Array = unit("m/s", 0.0)  # headwind at 10 m height
+    wind_exp: float | Array = unit("-", 1.0 / 7.0)  # power-law shear exponent
 
 
 class Launch(eqx.Module):
@@ -134,5 +158,5 @@ class Launch(eqx.Module):
     winch: Winch
     pilot: Pilot
     env: Env
-    rope_length: float | Array  # length of rope laid out on the runway [m]
-    slack: float | Array  # relative slack in the laid-out rope
+    rope_length: float | Array = unit("m")  # length of rope laid out on the runway
+    slack: float | Array = unit("-")  # relative slack in the laid-out rope

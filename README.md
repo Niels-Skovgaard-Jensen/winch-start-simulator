@@ -10,6 +10,10 @@ Simulator for glider winch launches, written in JAX and solved with
 * two winch models: tension-controlled, and power-limited engine
 * pilot (attitude PID with rotation / climb / top-of-launch schedule) and winch driver
 * release, back-release, weak-link and rope-in events; free flight after release
+* sensitivities of the release height to all ~80 parameters, with units, via
+  `jax.grad` through the ODE solve
+* ropes from datasheet values (diameter, mass per 100 m, breaking load,
+  elongation or EA) or TOML files
 * catalogue of gliders: Ka 8, ASK 13, LS4, ASK 21, ASG 29, DG-1000 (approximate data)
 
 The physics and the numerical approach are written up in
@@ -21,6 +25,9 @@ The physics and the numerical approach are written up in
 uv run main.py                                    # all gliders, Dyneema, tension winch
 uv run main.py --rope steel --winch engine
 uv run main.py --gliders "ASK 21" LS4 --pull 1.0 --rope-length 1000 --wind 5
+uv run main.py --rope-file ropes/example_dyneema_6mm.toml    # rope from a datasheet
+uv run main.py --rope steel --rope-param mu=0.09 --rope-param EA=1.2e6
+uv run main.py --gliders "ASK 13" --sensitivity [--only rope] # d(height)/d(parameter)
 uv run pytest
 ```
 
@@ -66,4 +73,6 @@ series = time_series(launch, sol)  # numpy arrays for plotting
 | `winch_sim/ground.py` | smooth ground contact |
 | `winch_sim/dynamics.py` | state, vector field, diagnostics |
 | `winch_sim/simulate.py` | diffrax solve with events, batching, summaries |
+| `winch_sim/sensitivity.py` | d(release height)/d(parameter) via `jax.grad` |
+| `ropes/*.toml` | example rope definitions |
 | `winch_sim/plots.py` | figures |

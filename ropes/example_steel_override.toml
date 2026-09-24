@@ -1,0 +1,6 @@
+# Example: start from the steel preset and override fields in SI units.
+base = "steel"
+diameter = 0.005      # m
+mu = 0.095            # kg/m
+EA = 1.2e6            # N
+breaking_load = 21e3  # N

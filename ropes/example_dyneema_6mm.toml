@@ -1,0 +1,12 @@
+# Example rope defined from datasheet values (illustrative numbers, not a specific
+# product). Use with:  uv run main.py --rope-file ropes/example_dyneema_6mm.toml
+name = "Dyneema 6 mm (example)"
+diameter_mm = 6.0
+mass_kg_per_100m = 2.3
+breaking_load_kN = 38.0
+elongation_at_break_pct = 4.0   # or give EA_N directly
+CDn = 1.2
+Cf = 0.01
+ground_mu = 0.4
+end_mass_kg = 8.0               # parachute + strop + weak link assembly
+end_CdA_m2 = 0.1

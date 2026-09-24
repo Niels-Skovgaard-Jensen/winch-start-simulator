@@ -237,12 +237,28 @@ A consequence visible in the launch results: in the climb the tension at the hoo
 exceeds the tension at the winch by roughly $\mu g\,\Delta z$ (≈ 300 N for steel at
 400 m).
 
-### 3.7 Rope presets
+### 3.7 Rope presets and rope input
 
-| | diameter | $\mu$ | $E\!A$ | $C_{Dn}$ | $C_f$ |
-|---|---|---|---|---|---|
-| steel wire | 4.5 mm | 0.080 kg/m | 1.0 MN | 1.2 | 0.02 |
-| Dyneema | 5.0 mm | 0.016 kg/m | 0.6 MN | 1.2 | 0.01 |
+| | diameter | $\mu$ | $E\!A$ | breaking load | $C_{Dn}$ | $C_f$ |
+|---|---|---|---|---|---|---|
+| steel wire | 4.5 mm | 0.080 kg/m | 1.0 MN | 17 kN | 1.2 | 0.02 |
+| Dyneema | 5.0 mm | 0.016 kg/m | 0.6 MN | 27 kN | 1.2 | 0.01 |
+
+These are generic, approximate values. A specific rope can be given in three ways:
+
+* `cable.rope_from_datasheet(diameter_mm, mass_kg_per_100m, breaking_load_kN,
+  elongation_at_break_pct | EA_N, CDn, Cf, ground_mu, end_mass_kg, end_CdA_m2, ...)`.
+  Without `EA_N`, the stiffness is the secant value
+  $E\!A = F_\text{break}/\varepsilon_\text{break}$. Synthetic ropes are stiffer
+  at working loads, so give `EA_N` from the load–elongation curve at 20–30 % of
+  the breaking load when you have it.
+* A TOML file with the same keys (`--rope-file ropes/example_dyneema_6mm.toml`), or
+  `base = "steel"` plus SI overrides of `Rope` fields
+  (`ropes/example_steel_override.toml`).
+* Single-field SI overrides on the command line: `--rope-param mu=0.09`.
+
+The breaking load does not affect the dynamics. It is used to report the rope safety
+factor $F_\text{break}/\max T$ in the summary table.
 
 ## 4. Winch
 
@@ -334,6 +350,9 @@ The launch ends at the first of:
 * **Derived quantities** (tensions, angles, load factor, power) are recomputed from
   saved states with the same `evaluate` function, `vmap`-ed over time, so plots can
   never disagree with the dynamics.
+* **Gradients.** `sensitivity.release_height` is the same stage-1 solve with
+  `SaveAt(t1=True)` and `RecursiveCheckpointAdjoint`. `eqx.filter_value_and_grad`
+  over the whole `Launch` pytree gives every parameter's sensitivity at once (§8b).
 * **Batching.** `simulate.solve_batch(launches)` stacks the parameter pytrees and
   `vmap`s the solve: all five catalogue gliders run as one compiled program in
   ~0.5 s after a few seconds of compilation.
@@ -374,6 +393,46 @@ Observations:
 * The peak load factor occurs during the rotation, which the simple pilot flies
   somewhat aggressively.
 
+## 8b. Sensitivities of the release height
+
+`uv run main.py --sensitivity [--only rope]` computes $\partial h/\partial p$ for
+all 80 model parameters (glider, rope, winch, pilot, environment, layout) in one
+reverse-mode pass of `jax.grad` through the diffrax solve
+(`sensitivity.py`, `RecursiveCheckpointAdjoint`). The release time is found by
+the event root finder, and its dependence on the parameters is differentiated
+implicitly. The gradients agree with central finite differences to < 0.5 %
+(`tests/test_sensitivity.py`). Tiny sensitivities are only as accurate as the
+solver tolerance, so the default is rtol = atol = 1e-8. A run takes ~10 s.
+
+For each parameter the table gives its value and unit, $\partial h/\partial p$
+in m per unit (angles per degree), the height change for a +10 % change, and
+the elasticity $(p/h)\,\partial h/\partial p$ (% height per % parameter).
+Everything else is held fixed: e.g. the winch pull, preset as 1.1 × weight, does
+not follow a change of glider mass. These are local linearisations. The full
+table goes to `results/sensitivity_<glider>_<rope>_<winch>.csv`.
+
+ASK 21, 1200 m Dyneema, tension winch (h = 481 m), largest effects:
+
+| parameter | value | ∂h/∂p | Δh for +10 % | elasticity |
+|---|---|---|---|---|
+| rope length | 1200 m | 0.380 m/m | +45.6 m | 0.95 |
+| winch pull `F_max` | 5072 N | 0.0488 m/N | +24.7 m | 0.51 |
+| glider mass | 470 kg | −0.464 m/kg | −21.8 m | −0.45 |
+| winch fade start `fade_beta0` | 50° | 0.75 m/deg | +3.8 m | 0.08 |
+| wing area | 17.95 m² | 1.92 m/m² | +3.4 m | 0.07 |
+| rope diameter | 5 mm | −6.6 m/mm | −3.3 m | −0.07 |
+| rope normal drag coefficient `CDn` | 1.2 | −27 m | −3.2 m | −0.07 |
+| pilot target speed | 105 km/h | −1.08 m/(m/s) | −3.1 m | −0.07 |
+| release cable angle | 72° | 0.41 m/deg | +3.0 m | 0.06 |
+| climb attitude | 40° | 0.63 m/deg | +2.5 m | 0.05 |
+
+Rope characteristics for the steel rope and the ASK 13 (`--only rope`): diameter
+−2.8 m, `CDn` −2.7 m, mass per length −1.7 m, parachute drag area −0.4 m,
+ground friction −0.4 m per +10 %. The axial stiffness EA has essentially **no**
+influence on release height (< 1 cm for +10 %). Rope stretch shapes the
+tension oscillations in the ground run (§3), not the energy that reaches the
+glider. Rope drag (diameter × `CDn`) matters about twice as much as rope weight.
+
 ## 9. Limitations and possible extensions
 
 * Pilot and winch driver are simple smooth control laws, not human models. Their
@@ -385,9 +444,10 @@ Observations:
 * Rope reel-in removes mass uniformly from all nodes (see 3.1). A "moving-node"
   formulation that removes mass only at the drum would be exact.
 * Winch drum physics is intentionally minimal (one effective mass).
-* Differentiability is in place but not yet used; natural next steps are optimising
-  the tension profile or pilot schedule for release height subject to
-  $V \le V_W$, $T \le$ weak link and $n \le n_\max$ with `jax.grad`.
+* The sensitivities (§8b) are local. For large changes (e.g. steel → Dyneema)
+  run the simulation directly. The same gradients could also drive an
+  optimisation of the tension profile or pilot schedule, subject to
+  $V \le V_W$, $T \le$ weak link and $n \le n_\max$.
 
 ## 10. Related literature
 
