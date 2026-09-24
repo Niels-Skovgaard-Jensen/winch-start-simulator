@@ -105,7 +105,7 @@ def _walk(params, grads, prefix=""):
 
 
 def sensitivities(launch: Launch, n_segments: int = 12, tol: float = 1e-8):
-    """Release height [m] and a list of Sensitivity rows, largest effect first."""
+    """Release height [m] and Sensitivity rows, sorted by |elasticity| (largest first)."""
     launch = as_float_arrays(launch)
     h, grads = height_and_gradient(launch, n_segments, tol)
     h = float(h)
@@ -121,7 +121,7 @@ def sensitivities(launch: Launch, n_segments: int = 12, tol: float = 1e-8):
                 elasticity=value * g / h,
             )
         )
-    rows.sort(key=lambda r: (-abs(r.dh_10pct), -abs(r.dh_dp)))
+    rows.sort(key=lambda r: (-abs(r.elasticity), -abs(r.dh_dp)))
     return h, rows
 
 
