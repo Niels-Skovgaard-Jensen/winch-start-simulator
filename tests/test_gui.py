@@ -9,7 +9,9 @@ QtWidgets = pytest.importorskip("PySide6.QtWidgets")
 from winch_sim.gui.app import (
     MainWindow,
     Numerics,
+    RunResult,
     default_launch,
+    release_info,
     run_launch,
 )
 
@@ -75,3 +77,21 @@ def test_clear_and_restore_comparison(window):
     window._set_all_compared(True)
     assert window.compare_pane.canvas is not None
     assert len(window.runs) >= 1  # clearing the comparison keeps the runs
+
+
+def test_release_indicator(window):
+    run = run_launch("r", window.current_launch(), Numerics(sensitivity=False))
+    i, head, detail, _, _ = release_info(run)
+    assert head == "PILOT RELEASE" and "cable angle" in detail
+    assert run.series["released"][i] == 0 and run.series["released"][i + 1] == 1
+    view = window.rope_view
+    view.set_run(run)
+    view.slider.setValue(0)
+    assert not view.banner.get_visible()
+    view.slider.setValue(view.slider.maximum())
+    assert view.banner.get_visible() and view.release_pt.get_visible()
+    # a weak-link failure gets its own label
+    broken = RunResult(
+        **{**run.__dict__, "summary": {**run.summary, "event": "weak_link"}}
+    )
+    assert release_info(broken)[1] == "WEAK LINK BREAK"

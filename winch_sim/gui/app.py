@@ -190,6 +190,42 @@ class NumericsForm(QtWidgets.QWidget):
         )
 
 
+# event -> (headline, marker, colour); colours: good / warning / critical / neutral
+RELEASE_STYLE = {
+    "release": ("PILOT RELEASE", "v", "#1a7f37"),
+    "back_release": ("BACK-RELEASE", "^", "#b45309"),
+    "weak_link": ("WEAK LINK BREAK", "X", "#c62828"),
+    "rope_in": ("ROPE REELED IN", "s", "#52514e"),
+    "no_liftoff": ("NO LIFT-OFF", "s", "#52514e"),
+    "t_max": ("TIME LIMIT REACHED", "s", "#52514e"),
+}
+
+
+def release_info(run: RunResult) -> tuple[int, str, str, str, str]:
+    """(index of the release sample, headline, detail, marker, colour)."""
+    s = run.series
+    released = np.flatnonzero(s["released"] > 0)
+    i = int(released[0]) - 1 if released.size else len(s["t"]) - 1
+    i = max(i, 0)
+    event = str(run.summary["event"])
+    head, marker, color = RELEASE_STYLE.get(event, (event.upper(), "s", "#52514e"))
+    L = run.launch
+    detail = {
+        "release": f"cable angle at hook {np.degrees(s['cable_angle'][i]):.0f}° "
+        f"(pilot releases at {np.degrees(float(L.pilot.release_angle)):.0f}°)",
+        "back_release": f"cable {np.degrees(s['cable_body'][i]):.0f}° below the "
+        f"fuselage axis (hook trips at "
+        f"{np.degrees(float(L.pilot.back_release_angle)):.0f}°)",
+        "weak_link": f"hook tension {s['T_hook'][i] / 1e3:.2f} kN reached the weak "
+        f"link rating {float(L.glider.weak_link) / 1e3:.2f} kN",
+        "rope_in": "less than 30 m of rope left out",
+        "no_liftoff": "still on the ground after 120 s",
+        "t_max": "the launch did not end within t_max",
+    }.get(event, "")
+    detail = f"t = {s['t'][i]:.1f} s, h = {s['height'][i]:.0f} m: {detail}"
+    return i, head, detail, marker, color
+
+
 class RopeView(QtWidgets.QWidget):
     """Rope shape and glider at a chosen time, with a slider and playback."""
 
@@ -250,6 +286,34 @@ class RopeView(QtWidgets.QWidget):
         )
         ax.set_aspect("equal", adjustable="datalim")
         ax.set(xlabel="x [m]", ylabel="z [m]", title=run.name)
+        # end-of-launch indicator: marker where it happened + banner, shown once the
+        # animation reaches that moment
+        self.i_rel, head, detail, marker, color = release_info(run)
+        (self.release_pt,) = ax.plot(
+            [s["x"][self.i_rel]],
+            [s["z"][self.i_rel]],
+            marker,
+            color=color,
+            ms=12,
+            mec=plots.SURFACE,
+            mew=1.5,
+            zorder=6,
+            label=head.lower(),
+        )
+        self.banner = ax.text(
+            0.98,
+            0.96,
+            f"{head}\n{detail}",
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=10,
+            color=color,
+            fontweight="bold",
+            bbox={"boxstyle": "round,pad=0.4", "fc": plots.SURFACE, "ec": color},
+            zorder=7,
+        )
+        self.release_head = head
         ax.legend(loc="upper left")
         self._draw(0)
 
@@ -273,7 +337,10 @@ class RopeView(QtWidgets.QWidget):
         s = self.run.series
         self.rope_line.set_data(s["rope_x"][i], s["rope_z"][i])
         self.glider_pt.set_data([s["x"][i]], [s["z"][i]])
-        phase = "free flight" if s["released"][i] else "on the cable"
+        ended = i >= self.i_rel
+        self.release_pt.set_visible(ended)
+        self.banner.set_visible(ended)
+        phase = f"after {self.release_head.lower()}" if ended else "on the cable"
         self.readout.setText(
             f"t = {s['t'][i]:.1f} s  ({phase})   height {s['height'][i]:.0f} m   "
             f"IAS {s['V_ias'][i] * 3.6:.0f} km/h   TAS {s['V_tas'][i] * 3.6:.0f} km/h"
