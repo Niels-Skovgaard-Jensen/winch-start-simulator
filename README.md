@@ -18,6 +18,12 @@ Simulator for glider winch launches, written in JAX and solved with
   indicated vs true airspeed
 * catalogue of gliders: Ka 8, ASK 13, LS4, ASK 21, ASG 29, DG-1000 (approximate data)
 
+![Launch geometry](docs/images/launch_geometry.png)
+
+*The glider climbs on a rope that sags under its own weight and drag, so at the
+hook it pulls more steeply downwards than the straight line to the winch
+(β = elevation seen from the winch).*
+
 The physics and the numerical approach are written up in Typst in
 [`docs/physics.typ`](docs/physics.typ) (bibliography in `docs/refs.yml`). Build the
 PDF with
@@ -25,6 +31,50 @@ PDF with
 ```sh
 typst compile docs/physics.typ    # -> docs/physics.pdf
 ```
+
+## Example results
+
+Six gliders on 1200 m of Dyneema with a power-limited engine winch
+(`uv run main.py --winch engine`). Every launch ends the usual way: the winch
+driver throttles down near the top, the rope goes slack and the tow hook's
+back-release opens.
+
+![Comparison of six gliders](docs/images/compare_gliders.png)
+
+One launch in detail (ASK 21, tension winch): rope shapes during the climb,
+tension at the winch and at the hook, speeds, angles, winch power and the pilot's
+elevator input.
+
+![ASK 21 launch in detail](docs/images/detail_ask21.png)
+
+## Sensitivity of the release height
+
+Every run also reports how much each of the ~80 parameters matters for the
+release height. `jax.grad` differentiates straight through the ODE solve,
+including the moment the launch ends. One backward pass gives ∂h/∂p for every
+parameter, and the results agree with finite differences to within 0.5 %. Each
+row shows the parameter's value and unit, ∂h/∂p (e.g. metres per mm of rope
+diameter), the height change for +10 %, and the *elasticity* (% height per %
+parameter). The table is sorted by elasticity. These are local values: for big
+changes, such as steel vs Dyneema, run the simulation instead.
+
+ASK 21, 1200 m Dyneema, tension winch (h = 491 m), largest effects:
+
+| parameter | ∂h/∂p | Δh for +10 % | elasticity |
+|---|---|---|---|
+| rope length (1200 m) | 0.39 m/m | +47 m | 0.96 |
+| winch pull (5.07 kN) | 51 m/kN | +26 m | 0.53 |
+| glider mass (470 kg) | −0.48 m/kg | −23 m | −0.46 |
+| pilot: end of nose lowering (70°) | 1.1 m/deg | +8 m | 0.15 |
+| pilot: climb attitude (40°) | 1.5 m/deg | +6 m | 0.12 |
+| pilot: target climb speed (105 km/h) | −0.57 m/(km/h) | −6 m | −0.12 |
+| rope diameter (5 mm) | −6.8 m/mm | −3 m | −0.07 |
+| rope drag coefficient (1.2) | −28 m | −3 m | −0.07 |
+
+Rope length, winch pull and glider mass dominate. After them come the pilot's
+technique and the rope's drag. Rope stretch (EA) hardly matters for height. The
+full table is written to `results/sensitivity_<glider>_<rope>_<winch>.csv`, and
+`--only rope` filters it.
 
 ## Desktop app
 
@@ -48,6 +98,11 @@ A Qt (PySide6) window with:
   * *Rope & glider*: rope shape and glider position with a time slider and playback.
   * *Sensitivity*: sortable, filterable table, exportable as CSV.
 * **File → Save/Load settings** as JSON (SI units).
+
+![Rope & glider view of the desktop app](docs/images/gui_rope_view.png)
+
+*Rope & glider view: a Ka 8 with the winch pulling 2.2 × its weight. The weak
+link breaks during the ground run, and the banner shows why.*
 
 ## Usage
 
