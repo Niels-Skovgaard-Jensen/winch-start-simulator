@@ -83,8 +83,12 @@ A Qt (PySide6) window with:
   `params.py`. Presets fill them in: a glider + pilot from the catalogue, a rope
   preset or TOML file, and a tension/engine winch scaled to the glider weight.
   Any value can then be edited.
-* **Run simulation** (Ctrl+R), in a background thread. The first run compiles the
-  model (~10 s).
+* **Run simulation** (Ctrl+R) and **Stop** (Esc). Simulations run in a separate
+  worker process, so a running simulation can be stopped at once; a fresh worker
+  starts right away. The worker compiles the model in the background when the app
+  starts (about 15 s, shown in the status bar). After that a run takes a couple of
+  seconds, and it only recompiles when the rope-segment count or the solver
+  settings change, not when physical values change.
 * **results:**
   * *Runs*: summary table of all runs; tick runs to compare them, reload a run's
     settings, export a time series as CSV.

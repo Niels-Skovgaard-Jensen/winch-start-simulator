@@ -7,7 +7,6 @@ import dataclasses
 import json
 import sys
 import time
-import traceback
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -23,100 +22,19 @@ from ..cable import ROPES, load_rope
 from ..gliders import CATALOGUE
 from ..params import Env, Glider, Launch, Pilot, Rope, Winch
 from ..report import COLUMNS, write_sensitivity_csv
-from ..sensitivity import sensitivities, sensitivity_unit
-from ..simulate import (
-    EVENTS,
-    LAUNCH_END_EVENTS,
-    T_MAX,
-    n_segments_for,
-    solve_launch,
-    summarize,
-    time_series,
-)
+from ..sensitivity import sensitivity_unit
 from ..winch import engine_winch, tension_winch
 from .forms import FloatEdit, ModuleForm, scrolled
+from .worker import (  # noqa: F401  (run_launch re-exported for scripts/tests)
+    WARMUP,
+    Numerics,
+    RunResult,
+    SimProcess,
+    default_launch,
+    run_launch,
+)
 
 WINCH_PRESETS = ("tension", "engine")
-
-
-@dataclasses.dataclass
-class Numerics:
-    segments_per_km: float = 10.0
-    t_max: float = T_MAX
-    rtol: float = 1e-6
-    atol: float = 1e-6
-    t_post: float = 8.0
-    sensitivity: bool = True
-    sensitivity_tol: float = 1e-8
-
-
-@dataclasses.dataclass
-class RunResult:
-    name: str
-    launch: Launch
-    numerics: Numerics
-    n_segments: int
-    summary: dict
-    series: dict
-    sens: tuple | None  # (height, rows)
-    note: str
-    elapsed: float
-
-
-def default_launch(glider="ASK 21", rope="dyneema") -> Launch:
-    g, p = CATALOGUE[glider]
-    return Launch(
-        glider=g,
-        rope=ROPES[rope],
-        winch=tension_winch(g),
-        pilot=p,
-        env=Env(),
-        rope_length=1200.0,
-        slack=0.002,
-    )
-
-
-def run_launch(name: str, launch: Launch, num: Numerics) -> RunResult:
-    """Simulate one launch (+ sensitivities).  Pure function, runs in a worker."""
-    t0 = time.perf_counter()
-    n = n_segments_for(launch.rope_length, num.segments_per_km)
-    sol = solve_launch(
-        launch,
-        n_segments=n,
-        t_max=num.t_max,
-        t_post=num.t_post,
-        rtol=num.rtol,
-        atol=num.atol,
-    )
-    summary = summarize(launch, sol)
-    series = time_series(launch, sol)
-    sens, note = None, ""
-    if num.sensitivity:
-        if summary["event"] in EVENTS[:LAUNCH_END_EVENTS]:
-            sens = sensitivities(
-                launch, n_segments=n, tol=num.sensitivity_tol, t_max=num.t_max
-            )
-        else:
-            note = f"no sensitivities: launch ended with {summary['event']}"
-    return RunResult(
-        name, launch, num, n, summary, series, sens, note, time.perf_counter() - t0
-    )
-
-
-class Worker(QtCore.QObject):
-    finished = QtCore.Signal(object)
-    failed = QtCore.Signal(str)
-
-    def __init__(self, name, launch, numerics):
-        super().__init__()
-        self.args = (name, launch, numerics)
-
-    @QtCore.Slot()
-    def run(self):
-        try:
-            self.finished.emit(run_launch(*self.args))
-        except Exception:  # noqa: BLE001  (report anything to the user)
-            self.failed.emit(traceback.format_exc())
 
 
 class FigurePane(QtWidgets.QWidget):
@@ -455,9 +373,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Winch launch simulator")
         self.resize(1560, 980)
         self.runs: list[RunResult] = []
-        self._thread: QtCore.QThread | None = None
-        self._worker: Worker | None = None
         self._run_counter = 0
+        # Simulations run in a worker process, so a running one can be stopped.
+        # It starts now, so JAX is imported while the user edits settings.
+        self._sim = SimProcess()
+        self._sim.start()
+        self._job: tuple[int, str, float] | None = None  # (id, name, start time)
+        self._poll_timer = QtCore.QTimer(self)
+        self._poll_timer.setInterval(100)
+        self._poll_timer.timeout.connect(self._poll)
+        self._warming = True  # the worker compiles the model on start-up
+        self._poll_timer.start()
 
         L = default_launch()
         self.glider_form = ModuleForm(L.glider)
@@ -476,7 +402,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(split)
         self._menus()
         self.statusBar().showMessage(
-            "Ready.  The first run compiles the model (~10 s)."
+            "Compiling the model in the background… you can edit settings meanwhile."
         )
 
     # ---- layout -----------------------------------------------------------------
@@ -543,12 +469,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.run_btn = QtWidgets.QPushButton("Run simulation")
         self.run_btn.setDefault(True)
         self.run_btn.clicked.connect(self._start_run)
+        self.stop_btn = QtWidgets.QPushButton("Stop")
+        self.stop_btn.setToolTip("stop the running simulation (Esc)")
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(self._stop_run)
         self.busy = QtWidgets.QProgressBar()
         self.busy.setRange(0, 0)
         self.busy.setMaximumWidth(120)
         self.busy.hide()
         run_box.addWidget(self.name_edit, 1)
         run_box.addWidget(self.busy)
+        run_box.addWidget(self.stop_btn)
         run_box.addWidget(self.run_btn)
         lay.addLayout(run_box)
         return panel
@@ -671,6 +602,9 @@ class MainWindow(QtWidgets.QMainWindow):
         act = r.addAction("Run simulation")
         act.setShortcut("Ctrl+R")
         act.triggered.connect(self._start_run)
+        act = r.addAction("Stop simulation")
+        act.setShortcut("Esc")
+        act.triggered.connect(self._stop_run)
 
     # ---- presets ----------------------------------------------------------------
 
@@ -801,7 +735,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return f"#{self._run_counter} {base}"
 
     def _start_run(self):
-        if self._thread is not None:
+        if self._job is not None:
             return
         try:
             launch = self.current_launch()
@@ -810,29 +744,78 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Invalid settings", str(e))
             return
         name = self._run_name()
-        self.run_btn.setEnabled(False)
-        self.busy.show()
-        msg = "simulating" + (" + sensitivities" if num.sensitivity else "")
-        self.statusBar().showMessage(f"{name}: {msg}…")
-        self._thread = QtCore.QThread(self)
-        self._worker = Worker(name, launch, num)
-        self._worker.moveToThread(self._thread)
-        self._thread.started.connect(self._worker.run)
-        self._worker.finished.connect(self._run_done)
-        self._worker.failed.connect(self._run_failed)
-        self._thread.start()
+        self._job = (self._run_counter, name, time.perf_counter())
+        self._sim.submit(self._run_counter, name, launch, num)
+        self._set_running(True)
+        self._poll()
 
-    def _finish_thread(self):
-        assert self._thread is not None
-        self._thread.quit()
-        self._thread.wait()
-        self._thread = None
-        self._worker = None
-        self.run_btn.setEnabled(True)
-        self.busy.hide()
+    def _set_running(self, running: bool):
+        self.run_btn.setEnabled(not running)
+        self.stop_btn.setEnabled(running)
+        self.busy.setVisible(running)
+        if running or self._warming:
+            self._poll_timer.start()
+        else:
+            self._poll_timer.stop()
+
+    def _poll(self):
+        msg = self._sim.poll()
+        if isinstance(msg, tuple) and msg[0] == WARMUP:
+            self._warming = False
+            _, status, payload = msg
+            if self._job is None:
+                self._set_running(False)
+                self.statusBar().showMessage(
+                    f"Ready: model compiled in {payload:.0f} s."
+                    if status == "ok"
+                    else "Background compilation failed; runs will compile on demand."
+                )
+            return
+        if self._job is None:
+            if msg == "dead":
+                self._warming = False
+                self._set_running(False)
+            return
+        job_id, name, t0 = self._job
+        if msg is None:
+            what = "sensitivities" if self.num_form.sens.isChecked() else ""
+            self.statusBar().showMessage(
+                f"{name}: simulating{' + ' + what if what else ''}… "
+                f"{time.perf_counter() - t0:.0f} s  (Esc to stop)"
+            )
+            return
+        if msg == "dead":
+            self._job = None
+            self._sim.start()
+            self._warming = True
+            self._set_running(False)
+            self._run_failed("The simulation worker process died unexpectedly.")
+            return
+        done_id, status, payload = msg
+        if done_id != job_id:  # a result of an earlier, stopped job
+            return
+        self._job = None
+        self._set_running(False)
+        if status == "ok":
+            self._run_done(payload)
+        else:
+            self._run_failed(payload)
+
+    def _stop_run(self):
+        """Kill the worker process (and the running job), then start a fresh one."""
+        if self._job is None:
+            return
+        _, name, t0 = self._job
+        self._job = None
+        self._sim.stop()
+        self._sim.start()
+        self._warming = True  # the new worker compiles the model again
+        self._set_running(False)
+        self.statusBar().showMessage(
+            f"{name}: stopped after {time.perf_counter() - t0:.0f} s."
+        )
 
     def _run_done(self, run: RunResult):
-        self._finish_thread()
         self.add_run(run)
         s = run.summary
         self.statusBar().showMessage(
@@ -841,13 +824,17 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
     def _run_failed(self, tb: str):
-        self._finish_thread()
         self.statusBar().showMessage("simulation failed")
         box = QtWidgets.QMessageBox(self)
         box.setWindowTitle("Simulation failed")
         box.setText(tb.strip().splitlines()[-1])
         box.setDetailedText(tb)
         box.exec()
+
+    def closeEvent(self, event):
+        self._poll_timer.stop()
+        self._sim.shutdown()
+        super().closeEvent(event)
 
     # ---- results ----------------------------------------------------------------
 

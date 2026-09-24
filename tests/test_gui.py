@@ -95,3 +95,22 @@ def test_release_indicator(window):
         **{**run.__dict__, "summary": {**run.summary, "event": "weak_link"}}
     )
     assert release_info(broken)[1] == "WEAK LINK BREAK"
+
+
+def test_stop_kills_the_running_simulation(window):
+    import time
+
+    app = QtWidgets.QApplication.instance()
+    window._start_run()
+    assert window._job is not None and window.stop_btn.isEnabled()
+    old = window._sim._proc
+    t0 = time.time()
+    while time.time() - t0 < 1.0:
+        app.processEvents()
+        time.sleep(0.02)
+    window._stop_run()
+    assert window._job is None
+    assert not old.is_alive()  # the job died with its worker
+    assert window._sim._proc.is_alive()  # a fresh worker is ready
+    assert window.run_btn.isEnabled() and not window.stop_btn.isEnabled()
+    assert "stopped" in window.statusBar().currentMessage()
