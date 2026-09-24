@@ -49,7 +49,7 @@ def test_preset_changes_glider_and_rescales_winch(window):
 
 def test_run_and_settings_roundtrip(window):
     run = run_launch("test", window.current_launch(), Numerics(sensitivity=False))
-    assert run.summary["event"] == "release"
+    assert run.summary["event"] == "back_release"
     window.add_run(run)
     assert window.runs_table.rowCount() == 1
     assert window.detail_combo.count() == 1
@@ -82,7 +82,7 @@ def test_clear_and_restore_comparison(window):
 def test_release_indicator(window):
     run = run_launch("r", window.current_launch(), Numerics(sensitivity=False))
     i, head, detail, _, _ = release_info(run)
-    assert head == "PILOT RELEASE" and "cable angle" in detail
+    assert head == "BACK-RELEASE" and "fuselage axis" in detail
     assert run.series["released"][i] == 0 and run.series["released"][i + 1] == 1
     view = window.rope_view
     view.set_run(run)

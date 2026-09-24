@@ -213,9 +213,9 @@ def release_info(run: RunResult) -> tuple[int, str, str, str, str]:
     detail = {
         "release": f"cable angle at hook {np.degrees(s['cable_angle'][i]):.0f}° "
         f"(pilot releases at {np.degrees(float(L.pilot.release_angle)):.0f}°)",
-        "back_release": f"cable {np.degrees(s['cable_body'][i]):.0f}° below the "
-        f"fuselage axis (hook trips at "
-        f"{np.degrees(float(L.pilot.back_release_angle)):.0f}°)",
+        "back_release": f"rope slack (hook tension {s['T_hook'][i] / 1e3:.2f} kN), "
+        f"cable {np.degrees(s['cable_body'][i]):.0f}° below the fuselage axis "
+        f"(hook trips at {np.degrees(float(L.pilot.back_release_angle)):.0f}°)",
         "weak_link": f"hook tension {s['T_hook'][i] / 1e3:.2f} kN reached the weak "
         f"link rating {float(L.glider.weak_link) / 1e3:.2f} kN",
         "rope_in": "less than 30 m of rope left out",

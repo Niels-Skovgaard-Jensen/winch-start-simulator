@@ -120,7 +120,10 @@ def make_pilot(
         "Kd": 0.6,
         "tau": 0.25,
         "de_max": d(25.0),
-        "release_angle": d(72.0),
+        # Pilots cannot judge the cable angle: by default the launch ends when the
+        # winch throttles down, the rope slackens and the hook's back-release trips.
+        # A value < 180 deg makes the pilot release at that local cable angle.
+        "release_angle": d(180.0),
         "back_release_angle": d(110.0),
     }
     kwargs.update(overrides)

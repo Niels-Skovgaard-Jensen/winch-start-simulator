@@ -154,7 +154,7 @@ class Pilot(eqx.Module):
     de_max: float | Array = unit("rad")  # elevator deflection limit
     release_angle: float | Array = unit(
         "rad"
-    )  # pilot releases at this local cable angle
+    )  # pilot releases at this local cable angle (180 deg = never)
     back_release_angle: float | Array = unit(
         "rad"
     )  # hook back-release (cable vs. body x)

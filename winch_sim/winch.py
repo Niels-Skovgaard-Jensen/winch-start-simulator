@@ -23,7 +23,8 @@ def available_pull(w: Winch, v_reel):
 
 
 def throttle(w: Winch, t, beta):
-    """Driver's throttle: ramp up after t_start, fade out as the glider gets high."""
+    """Driver's throttle: ramp up after t_start, throttle down as the glider gets
+    high (elevation fade_beta0 -> fade_beta1, down to fade_floor x full power)."""
     ramp = smoothstep((t - w.t_start) / w.t_ramp)
     fade = 1.0 - (1.0 - w.fade_floor) * smoothstep(
         (beta - w.fade_beta0) / (w.fade_beta1 - w.fade_beta0)
@@ -44,9 +45,11 @@ def _defaults(**kw) -> dict:
         "b_fric": 20.0,
         "t_start": 1.0,
         "t_ramp": 3.0,
-        "fade_beta0": jnp.deg2rad(50.0),
+        # The driver throttles right down as the glider passes ~65-70 deg elevation;
+        # the rope goes slack and the hook's back-release trips.
+        "fade_beta0": jnp.deg2rad(65.0),
         "fade_beta1": jnp.deg2rad(70.0),
-        "fade_floor": 0.4,
+        "fade_floor": 0.0,
         "height": 1.0,
     }
     d.update(kw)

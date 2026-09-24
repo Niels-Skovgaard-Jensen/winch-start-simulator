@@ -176,7 +176,7 @@ def ask21_dyneema():
 
 def test_launch_is_plausible(ask21_dyneema):
     _, s = ask21_dyneema
-    assert s["event"] == "release"
+    assert s["event"] == "back_release"
     assert 350 < s["release_height"] < 600  # ~40% of a 1200 m rope
     assert 30 < s["release_time"] < 70
     assert 1.3 < s["max_n"] < 4.0
@@ -201,7 +201,7 @@ def test_heavy_steel_rope_costs_height(ask21_dyneema):
 def test_engine_winch_launch_releases():
     L = _launch(winch="engine")
     s = summarize(L, solve_launch(L, n_segments=12))
-    assert s["event"] == "release"
+    assert s["event"] == "back_release"
     assert s["release_height"] > 300
 
 
@@ -228,7 +228,7 @@ def test_vmap_batch_matches_single_runs(ask21_dyneema):
     s1 = summarize(L_ka8, unstack(sol, 1))
     np.testing.assert_allclose(s0["release_height"], s_ask["release_height"], rtol=1e-6)
     assert abs(s0["release_height"] - s1["release_height"]) > 1.0
-    assert EVENTS[int(unstack(sol, 1).event)] == "release"
+    assert EVENTS[int(unstack(sol, 1).event)] == "back_release"
 
 
 # --- atmosphere -------------------------------------------------------------------
@@ -261,7 +261,7 @@ def test_high_airfield_costs_height():
     hi = dataclasses.replace(L, env=Env(field_elevation=2000.0, isa_dT=15.0))
     s0 = summarize(L, solve_launch(L, n_segments=12))
     s1 = summarize(hi, solve_launch(hi, n_segments=12))
-    assert s1["event"] == "release"
+    assert s1["event"] == "back_release"
     assert s1["release_height"] < s0["release_height"]
     assert s1["ground_roll"] > s0["ground_roll"]  # higher TAS needed to lift off
 

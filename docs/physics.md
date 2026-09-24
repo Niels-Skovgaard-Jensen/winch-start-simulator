@@ -337,9 +337,11 @@ $F_\text{avail}$ is a smooth $\min(F_\max, P_\max/v)$:
   reel speeds up and *rises* when the glider slows the rope down (e.g. during
   rotation) — a real mechanism behind weak-link failures of light gliders.
 
-The driver's throttle $\tau$ ramps up over 3 s after $t = 1$ s and fades to 40 %
-as the glider elevation seen from the winch, $\beta = \operatorname{atan2}(z - z_w, x_w - x)$,
-goes from 50° to 70°. For the engine winch the driver sets the throttle so that the
+The driver's throttle $\tau$ ramps up over 3 s after $t = 1$ s. At the top the
+driver **throttles right down** (to `fade_floor` = 0) as the glider elevation seen
+from the winch, $\beta = \operatorname{atan2}(z - z_w, x_w - x)$, goes from 65° to
+70°. The drum stops pulling, the rope slackens and its weight (plus parachute)
+drags the hook end down and back until the back-release trips (§6). For the engine winch the driver sets the throttle so that the
 pull at 15 m/s reel speed is $k_T\,mg$. After release the drum is braked.
 
 ## 5. Pilot
@@ -375,8 +377,8 @@ The launch ends at the first of:
 
 | event | condition |
 |---|---|
-| `release` | local cable angle at the hook reaches 72° below horizontal (pilot pulls the release) |
-| `back_release` | cable more than 110° below the fuselage axis (hook back-release) |
+| `back_release` | cable more than 110° below the fuselage axis: the hook's back-release trips. **The normal end of a launch**: after the winch throttles down the rope goes slack, the glider flies on over the rope end and the cable pulls from behind |
+| `release` | pilot release at a local cable angle `Pilot.release_angle`. Off by default (180°), since pilots cannot judge the cable angle; set e.g. 72–85° to model a pilot who releases early |
 | `weak_link` | hook tension exceeds the glider's weak-link rating |
 | `rope_in` | less than 30 m of rope left out |
 | `no_liftoff` | still on the ground after 120 s (e.g. rope too heavy to drag); a failed launch, no sensitivities |
@@ -483,7 +485,7 @@ ASK 21, 1200 m Dyneema, tension winch (h = 481 m), largest effects:
 | rope diameter | 5 mm | −6.6 m/mm | −3.3 m | −0.07 |
 | rope normal drag coefficient `CDn` | 1.2 | −27 m | −3.2 m | −0.07 |
 | pilot target speed | 105 km/h | −1.08 m/(m/s) | −3.1 m | −0.07 |
-| release cable angle | 72° | 0.41 m/deg | +3.0 m | 0.06 |
+| release cable angle | 72°* | 0.41 m/deg | +3.0 m | 0.06 |
 | climb attitude | 40° | 0.63 m/deg | +2.5 m | 0.05 |
 
 Rope characteristics for the steel rope and the ASK 13 (`--only rope`): diameter
@@ -493,9 +495,34 @@ influence on release height (< 1 cm for +10 %). Rope stretch shapes the
 tension oscillations in the ground run (§3), not the energy that reaches the
 glider. Rope drag (diameter × `CDn`) matters about twice as much as rope weight.
 
+\* The results in §3.8, §8 and §8b were computed with an earlier end-of-launch
+model: the driver faded the winch to 40 % between 50° and 70° elevation, and the
+pilot released at 72° local cable angle. The current default (throttle down to
+idle at 65–70°, launch ended by the back-release) gives release heights within
+about ±10 m of those values (catalogue, 1200 m Dyneema, tension winch: Ka 8 462 m,
+ASK 13 478 m, LS4 459 m, ASK 21 491 m, ASG 29 467 m, DG-1000 496 m). The
+back-release trips 1–7 s after the throttle-down, at 0.1–0.5 kN hook tension and
+64–105 km/h IAS.
+
+For reference, a sweep of the (optional) pilot release angle with the old winch
+fade, ASK 21 on 1200 m Dyneema, tension winch:
+
+| release angle | 72° | 76° | 80° | 85° | 95° |
+|---|---|---|---|---|---|
+| release height | 480 m | 481 m | 479 m | 477 m | 473 m |
+| launch time | 44.2 s | 45.7 s | 47.1 s | 48.8 s | 52.3 s |
+| IAS at release | 74 km/h | 77 km/h | 82 km/h | 86 km/h | 86 km/h |
+
+Release height hardly depends on when exactly the launch ends near the top.
+With the old 40 % power floor the rope stayed taut, so the back-release never
+tripped; with a real throttle-down it does.
+
 ## 9. Limitations and possible extensions
 
-* Pilot and winch driver are simple smooth control laws, not human models. Their
+* Pilot and winch driver are simple smooth control laws, not human models. The
+  launch ends by the hook's back-release after the driver throttles down on a
+  visual cue (glider elevation). A pilot release when the pull fades (a
+  tension cue) would be an alternative. Their
   parameters (rotation height, climb attitude, tension profile) dominate the results
   as much as the glider's aerodynamics do — just as in real life.
 * The glider data are approximate estimates, not manufacturer data.
