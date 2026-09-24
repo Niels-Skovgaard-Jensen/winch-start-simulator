@@ -64,7 +64,7 @@ class LaunchSolution(NamedTuple):
 def solve_launch(
     launch: Launch,
     n_segments: int = 16,
-    t_max: float = 120.0,
+    t_max: float = 1000.0,
     dt_save: float = 0.1,
     t_post: float = 8.0,
     solver: Literal["tsit5", "kvaerno5"] = "tsit5",

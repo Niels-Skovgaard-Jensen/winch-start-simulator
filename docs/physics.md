@@ -346,14 +346,17 @@ The launch ends at the first of:
 | glider | mass | $V_W$ | rope / winch | release height | time | ground roll | max V | max $T_\text{hook}$ | max L/W |
 |---|---|---|---|---|---|---|---|---|---|
 | Ka 8 | 290 kg | 100 km/h | Dyneema / tension | 454 m | 50 s | 46 m | **128 km/h** | 3.0 kN | 2.6 |
+| ASK 13 | 460 kg | 120 km/h | Dyneema / tension | 470 m | 43 s | 52 m | **149 km/h** | 5.0 kN | 2.8 |
 | LS4 | 360 kg | 130 km/h | Dyneema / tension | 456 m | 42 s | 69 m | **150 km/h** | 4.1 kN | 3.0 |
 | ASK 21 | 470 kg | 150 km/h | Dyneema / tension | 481 m | 45 s | 52 m | **151 km/h** | 5.4 kN | 3.2 |
 | ASG 29 | 420 kg | 150 km/h | Dyneema / tension | 465 m | 39 s | 75 m | **157 km/h** | 4.8 kN | 3.0 |
 | DG-1000 | 620 kg | 150 km/h | Dyneema / tension | 493 m | 40 s | 64 m | **165 km/h** | 7.0 kN | 3.3 |
 | Ka 8 | | | steel / tension | 434 m | 50 s | 57 m | 121 km/h | 3.3 kN | 2.5 |
+| ASK 13 | | | steel / tension | 459 m | 44 s | 58 m | **144 km/h** | 5.2 kN | 2.7 |
 | ASK 21 | | | steel / tension | 468 m | 45 s | 59 m | 146 km/h | 5.7 kN | 3.1 |
 | DG-1000 | | | steel / tension | 484 m | 40 s | 70 m | 161 km/h | 7.3 kN | 3.2 |
 | Ka 8 | | | Dyneema / engine | 444 m | 51 s | 70 m | 107 km/h | 3.7 kN | 2.2 |
+| ASK 13 | | | Dyneema / engine | 441 m | 45 s | 69 m | 119 km/h | 5.9 kN | 2.3 |
 | ASK 21 | | | Dyneema / engine | 452 m | 46 s | 65 m | 122 km/h | 6.0 kN | 2.6 |
 | DG-1000 | | | Dyneema / engine | 449 m | 42 s | 81 m | 132 km/h | 7.9 kN | 2.5 |
 

@@ -10,7 +10,7 @@ Simulator for glider winch launches, written in JAX and solved with
 * two winch models: tension-controlled, and power-limited engine
 * pilot (attitude PID with rotation / climb / top-of-launch schedule) and winch driver
 * release, back-release, weak-link and rope-in events; free flight after release
-* catalogue of gliders: Ka 8, LS4, ASK 21, ASG 29, DG-1000 (approximate data)
+* catalogue of gliders: Ka 8, ASK 13, LS4, ASK 21, ASG 29, DG-1000 (approximate data)
 
 The physics and the numerical approach are written up in
 [`docs/physics.md`](docs/physics.md).

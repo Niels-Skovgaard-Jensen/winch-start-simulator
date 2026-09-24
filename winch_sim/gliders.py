@@ -143,6 +143,25 @@ CATALOGUE: dict[str, tuple[Glider, Pilot]] = {
         ),
         make_pilot(V_target_kmh=85.0, theta_climb_deg=35.0),
     ),
+    # Classic two-seat trainer (1966).  Span, area, empty mass 295 kg, MTOW 480 kg,
+    # L/D 27 @ 85 km/h and max winch speed 120 km/h from the flight manual;
+    # weak link: manual allows 1850-2350 lb for winch launch -> 1000 daN (Tost black).
+    # Recommended winch speed ~55 kt.  Estimated: dual launch mass, CLmax (from the
+    # 57 km/h stall speed at solo weight), inertia and hook/wheel geometry.
+    "ASK 13": (
+        make_glider(
+            mass=460.0,
+            span=16.0,
+            area=17.5,
+            LD_max=27.0,
+            CLmax=1.4,
+            V_W_kmh=120.0,
+            weak_link_daN=1000.0,
+            radius_of_gyration=1.3,
+            hook_x=0.35,
+        ),
+        make_pilot(V_target_kmh=100.0, theta_climb_deg=35.0),
+    ),
     # Club-class 15 m single seater
     "LS4": (
         make_glider(
