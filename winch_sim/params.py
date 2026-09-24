@@ -70,8 +70,8 @@ class Glider(eqx.Module):
     hook_z: float | Array = unit("m")
 
     # Ground contact points (nose skid, main wheel, tail wheel/skid), body frame
-    contact_x: Array = unit("m")  # shape (3,)
-    contact_z: Array = unit("m")  # shape (3,)
+    contact_x: Array = unit("m")  # x of nose skid, main wheel, tail
+    contact_z: Array = unit("m")  # z of nose skid, main wheel, tail
     contact_k: Array = unit("N/m")  # spring stiffness
     contact_c: Array = unit("N s/m")  # damping
     contact_mu: Array = unit("-")  # friction coefficient
@@ -84,7 +84,7 @@ class Glider(eqx.Module):
 class Rope(eqx.Module):
     """Winch cable: lumped-mass elastic rope with weight and aerodynamic drag."""
 
-    diameter: float | Array = unit("m", display="mm")
+    diameter: float | Array = unit("m", display="mm")  # rope diameter
     mu: float | Array = unit("kg/m")  # mass per unit length
     EA: float | Array = unit("N", display="kN")  # axial stiffness
     breaking_load: float | Array = unit("N", display="kN")  # minimum breaking load
@@ -148,7 +148,7 @@ class Pilot(eqx.Module):
     top_beta1: float | Array = unit("rad")  # ... and where it is complete
     theta_glide: float | Array = unit("rad")  # attitude after release
     Kp: float | Array = unit("-")  # elevator per attitude error
-    Ki: float | Array = unit("1/s")
+    Ki: float | Array = unit("1/s")  # integral gain on the attitude error
     Kd: float | Array = unit("s")  # elevator per pitch rate
     tau: float | Array = unit("s")  # pilot/stick lag
     de_max: float | Array = unit("rad")  # elevator deflection limit
@@ -163,7 +163,7 @@ class Pilot(eqx.Module):
 class Env(eqx.Module):
     field_elevation: float | Array = unit("m", 0.0)  # airfield height above MSL
     isa_dT: float | Array = unit("K", 0.0)  # temperature offset from ISA
-    g: float | Array = unit("m/s^2", 9.81)
+    g: float | Array = unit("m/s^2", 9.81)  # gravitational acceleration
     wind_ref: float | Array = unit("m/s", 0.0)  # headwind at 10 m height
     wind_exp: float | Array = unit("-", 1.0 / 7.0)  # power-law shear exponent
 

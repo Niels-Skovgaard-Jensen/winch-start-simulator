@@ -8,7 +8,11 @@ dependencies = [
     "diffrax>=0.7.2",
     "jax>=0.11.2",
     "matplotlib>=3.11.2",
+    "pyside6>=6.11.2",
 ]
+
+[project.scripts]
+winch-gui = "winch_sim.gui.app:main"
 
 [dependency-groups]
 dev = [

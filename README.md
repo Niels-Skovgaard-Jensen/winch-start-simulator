@@ -21,6 +21,29 @@ Simulator for glider winch launches, written in JAX and solved with
 The physics and the numerical approach are written up in
 [`docs/physics.md`](docs/physics.md).
 
+## Desktop app
+
+```sh
+uv run winch-gui          # or: uv run python -m winch_sim.gui
+```
+
+A Qt (PySide6) window with:
+
+* **settings:** every model parameter in tabs (launch & air, glider, pilot, rope,
+  winch, numerics), shown in display units with the descriptions from
+  `params.py`. Presets fill them in: a glider + pilot from the catalogue, a rope
+  preset or TOML file, and a tension/engine winch scaled to the glider weight.
+  Any value can then be edited.
+* **Run simulation** (Ctrl+R), in a background thread. The first run compiles the
+  model (~10 s).
+* **results:**
+  * *Runs*: summary table of all runs; tick runs to compare them, reload a run's
+    settings, export a time series as CSV.
+  * *Comparison* and *Detail*: the plots, with zoom/pan.
+  * *Rope & glider*: rope shape and glider position with a time slider and playback.
+  * *Sensitivity*: sortable, filterable table, exportable as CSV.
+* **File → Save/Load settings** as JSON (SI units).
+
 ## Usage
 
 ```sh
@@ -82,3 +105,5 @@ series = time_series(launch, sol)  # numpy arrays for plotting
 | `winch_sim/sensitivity.py` | d(release height)/d(parameter) via `jax.grad` |
 | `ropes/*.toml` | example rope definitions |
 | `winch_sim/plots.py` | figures |
+| `winch_sim/report.py` | summary columns, sensitivity CSV (shared by CLI and GUI) |
+| `winch_sim/gui/` | Qt desktop app (`app.py`), auto-generated settings forms (`forms.py`) |
