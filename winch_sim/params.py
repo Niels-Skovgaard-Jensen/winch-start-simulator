@@ -4,7 +4,7 @@ All parameter sets are `equinox.Module`s holding only float (or float-array) lea
 so they are JAX pytrees: they can be passed through `jit`, stacked and `vmap`-ed over
 (e.g. a batch of gliders) and differentiated with `jax.grad`.
 
-Conventions (see docs/physics.md):
+Conventions (see docs/physics.typ):
   * earth frame: x horizontal, pointing from the glider's start towards the winch; z up
   * body frame: x forward along the fuselage, z up (towards the canopy)
   * pitch angle theta is positive nose-up, the pitching moment positive nose-up

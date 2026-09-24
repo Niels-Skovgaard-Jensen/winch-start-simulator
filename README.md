@@ -18,8 +18,13 @@ Simulator for glider winch launches, written in JAX and solved with
   indicated vs true airspeed
 * catalogue of gliders: Ka 8, ASK 13, LS4, ASK 21, ASG 29, DG-1000 (approximate data)
 
-The physics and the numerical approach are written up in
-[`docs/physics.md`](docs/physics.md).
+The physics and the numerical approach are written up in Typst in
+[`docs/physics.typ`](docs/physics.typ) (bibliography in `docs/refs.yml`). Build the
+PDF with
+
+```sh
+typst compile docs/physics.typ    # -> docs/physics.pdf
+```
 
 ## Desktop app
 

@@ -1,0 +1,119 @@
+gab2011:
+  type: article
+  title: Numerical Simulation of Glider Winch Launches
+  author: ["Gäb, Andreas", "Santel, Christoph"]
+  date: 2011
+  parent:
+    type: periodical
+    title: Technical Soaring
+    volume: 35
+    issue: 3
+  url: https://ts.ostiv.org/index.php/ts/article/view/76
+
+rwth2008:
+  type: thesis
+  title: Numeric Simulation of a Glider Winch Launch
+  date: 2008
+  organization: Chair of Flight Dynamics, RWTH Aachen University
+  note: study thesis
+  url: http://publications.rwth-aachen.de/record/230129/files/3265.pdf
+
+santel:
+  type: thesis
+  title: >-
+    An investigation of glider winch launch accidents utilizing multipoint
+    aerodynamics models in flight simulation
+  author: Santel, Christoph
+  organization: RWTH Aachen University
+  note: diploma thesis
+
+bogan:
+  type: web
+  title: Glider Winch Launch Simulation
+  author: Bogan, Larry
+  url: https://bogan.ca/soaring/winch/winch.html
+
+aq1977:
+  type: article
+  title: Maximum Altitude Sailplane Winch-Launch Trajectories
+  date: 1977
+  page-range: 75-84
+  serial-number:
+    doi: 10.1017/S0001925900007976
+  parent:
+    type: periodical
+    title: Aeronautical Quarterly
+    volume: 28
+    issue: 2
+
+eppler:
+  type: article
+  title: Windenschlepp und optimale Ausklinkhöhe
+  author: Eppler, Richard
+
+pierson:
+  type: misc
+  title: Follow-up work on optimal sailplane trajectories
+  author: ["Pierson", "Chen"]
+  note: Journal of Aircraft (1979); Optimal Control Applications and Methods (1980)
+
+browning2007:
+  type: article
+  title: Boundaries of Safe Winch Launching
+  author: Browning, Hugh
+  date: 2007
+  page-range: 95
+  parent:
+    type: periodical
+    title: Technical Soaring
+    volume: 31
+    issue: 4
+  url: https://soaringweb.org/Soaring_Index/Technical_Soaring/Technical_Soaring_issue.html
+
+hills2007:
+  type: article
+  title: Safety Analysis of the Winch Launch
+  author: Hills, Trevor
+  date: 2007
+  page-range: 101
+  parent:
+    type: periodical
+    title: Technical Soaring
+    volume: 31
+    issue: 4
+
+winchdesign:
+  type: article
+  title: The Design and Development of Glider Launching Winches
+  parent:
+    type: periodical
+    title: Technical Soaring
+  url: https://ts.ostiv.org/index.php/ts/article/view/942/0
+
+smith:
+  type: report
+  title: Winches; Winch launching revisited
+  author: Smith, Bernald S.
+  organization: Soaring Safety Foundation
+  url: https://www.soaringsafety.org/publications/Winch-launching-revisited.pdf
+
+irvine1981:
+  type: book
+  title: Cable Structures
+  author: Irvine, H. Max
+  date: 1981
+  publisher: MIT Press
+
+williams2007:
+  type: report
+  title: Modeling and control of a kite on a variable length flexible inelastic tether
+  author: ["Williams", "Lansdorp", "Ockels"]
+  date: 2007
+  serial-number: AIAA-2007-6705
+
+skysails:
+  type: article
+  title: A quaternion-based model for optimal control of the SkySails airborne wind energy system
+  serial-number:
+    arxiv: "1508.05494"
+  url: https://arxiv.org/abs/1508.05494
