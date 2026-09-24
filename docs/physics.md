@@ -223,7 +223,7 @@ back-release and that the pilot sees.
 ### 3.6 Validation: elastic catenary
 
 For a rope hanging still between two points, the exact solution is the elastic
-catenary (Irvine 1981), parametrised by unstretched arc length $s$ with constant
+catenary (Irvine 1981, ref. 11 in §10), parametrised by unstretched arc length $s$ with constant
 horizontal tension $H$ and vertical tension $V(s) = V_0 + w s$:
 
 $$
@@ -388,3 +388,77 @@ Observations:
 * Differentiability is in place but not yet used; natural next steps are optimising
   the tension profile or pilot schedule for release height subject to
   $V \le V_W$, $T \le$ weak link and $n \le n_\max$ with `jax.grad`.
+
+## 10. Related literature
+
+**Winch-launch simulation**
+
+1. A. Gäb, C. Santel, "Numerical Simulation of Glider Winch Launches",
+   *Technical Soaring* 35(3), 2011.
+   [ts.ostiv.org/index.php/ts/article/view/76](https://ts.ostiv.org/index.php/ts/article/view/76)
+   ([PDF](https://ts.ostiv.org/index.php/ts/article/download/76/69)).
+   RWTH Aachen, Matlab/Simulink. Models aircraft, pilot, winch, winch operator,
+   cable, atmosphere and terrain. The cable is mass points joined by spring–damper
+   links with drag, weight and ground reaction, the same approach as §3 here. Pilot
+   and winch operator are PID controllers with reaction time and neuromuscular delay.
+   Analyses: a reference launch, wind, and overly steep initial climbs. **The best
+   reference to validate this model against.**
+2. "Numeric Simulation of a Glider Winch Launch", study thesis, Chair of Flight
+   Dynamics, RWTH Aachen, 2008.
+   [publications.rwth-aachen.de/record/230129](http://publications.rwth-aachen.de/record/230129/files/3265.pdf)
+   ([CORE](https://core.ac.uk/download/pdf/36588266.pdf)). The origin of (1).
+   Findings: opening the throttle quickly destabilises the phugoid; the tow-hook
+   position can be optimised; release height depends on cable type, tow distance,
+   maximum winch force and especially cable drag. Lists ground effect and
+   ground/cable friction as missing.
+3. C. Santel, "An investigation of glider winch launch accidents utilizing
+   multipoint aerodynamics models in flight simulation", diploma thesis,
+   RWTH Aachen (cited in 1).
+4. L. Bogan, "Glider Winch Launch Simulation" (web page, not peer-reviewed).
+   [bogan.ca/soaring/winch/winch.html](https://bogan.ca/soaring/winch/winch.html).
+   Prescribed flight path, MathCAD. Gives a good intuition for cable drag growing
+   as the rope turns broadside.
+
+**Optimal launch trajectories**
+
+5. "Maximum Altitude Sailplane Winch-Launch Trajectories", *Aeronautical Quarterly*
+   28(2), pp. 75–84, 1977.
+   [doi:10.1017/S0001925900007976](https://doi.org/10.1017/S0001925900007976).
+   With limits on C_L and cable acceleration, the optimal trajectory is
+   climb–dive–climb; adding a reel-in speed limit makes it more realistic. The
+   benchmark for a `jax.grad`-based optimisation (§9).
+6. R. Eppler, "Windenschlepp und optimale Ausklinkhöhe" (winch launch and optimal
+   release height), cited in (1).
+7. Pierson and Chen, follow-up work on optimal sailplane trajectories,
+   *Journal of Aircraft* (1979), *Optimal Control Applications and Methods* (1980).
+
+**Safety and winch engineering**
+
+8. H. Browning, "Boundaries of Safe Winch Launching", *Technical Soaring* 31(4),
+   p. 95, 2007; T. Hills, "Safety Analysis of the Winch Launch", ibid., p. 101.
+   [Index](https://soaringweb.org/Soaring_Index/Technical_Soaring/Technical_Soaring_issue.html).
+9. "The Design and Development of Glider Launching Winches", *Technical Soaring*.
+   [ts.ostiv.org/index.php/ts/article/view/942](https://ts.ostiv.org/index.php/ts/article/view/942/0).
+   Design formulae for winch hardware.
+10. B. S. Smith, Soaring Safety Foundation:
+    [Winches](https://www.soaringsafety.org/publications/winches.pdf),
+    [Winch launching revisited](https://www.soaringsafety.org/publications/Winch-launching-revisited.pdf).
+
+**Cable / tether modelling**
+
+11. H. M. Irvine, *Cable Structures*, MIT Press, 1981. The elastic catenary used
+    for validation in §3.6.
+12. Williams, Lansdorp, Ockels, "Modeling and control of a kite on a
+    variable length flexible inelastic tether", AIAA-2007-6705 (cited in 1).
+    Variable-length tether modelling, cf. the reel-in approach in §3.1.
+13. "A quaternion-based model for optimal control of the SkySails airborne wind
+    energy system", [arXiv:1508.05494](https://arxiv.org/abs/1508.05494).
+    Optimal control with tether force and reel-out speed as variables.
+
+**How this model compares with (1)**: the structure is the same (lumped-mass cable,
+PID pilot, tension-controlled winch operator). Differences: (1) includes human
+reaction and neuromuscular delays and a more detailed winch/operator model. This
+model uses a fixed-size reel-in discretisation, smooth contact models (one
+continuous ODE instead of mode switching), and JAX/diffrax for batching and
+gradients. Obvious next steps: reproduce the reference launch from (1), and add
+reaction delays to the pilot and winch driver.
