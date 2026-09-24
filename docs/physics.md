@@ -341,9 +341,11 @@ The launch ends at the first of:
 * **Events.** `diffrax.Event` with the four condition functions above
   (sign change, `direction=True`) and an `optimistix.Newton` root finder to locate
   the release instant exactly. `sol.event_mask` says which one fired.
-* **Saving.** `SaveAt(subs=[SubSaveAt(ts=grid), SubSaveAt(t1=True)])` — the grid for
-  plotting, `t1` for the exact state at release (with events, a plain `ts`+`t1`
-  save puts the final point into the next free grid slot).
+* **Saving (two passes).** Pass 1 runs to the event with `SaveAt(t1=True)` only,
+  so the time limit `t_max` (default 10⁵ s, `--t-max`) costs nothing, and
+  `max_steps` is 5·10⁶. Pass 2 repeats the deterministic solve from 0 to the
+  release time and saves 2000 evenly spaced points for plotting and diagnostics.
+  Long and short launches get the same number of plot points.
 * **Two stages.** A second `diffeqsolve` from the release state with
   `attached = 0` continues the glider in free flight (push-over, pick-up of speed)
   while the rope falls.
@@ -395,7 +397,7 @@ Observations:
 
 ## 8b. Sensitivities of the release height
 
-`uv run main.py --sensitivity [--only rope]` computes $\partial h/\partial p$ for
+Every `uv run main.py` run (unless `--no-sensitivity`; `--only rope` filters the table) computes $\partial h/\partial p$ for
 all 80 model parameters (glider, rope, winch, pilot, environment, layout) in one
 reverse-mode pass of `jax.grad` through the diffrax solve
 (`sensitivity.py`, `RecursiveCheckpointAdjoint`). The release time is found by

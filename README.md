@@ -27,11 +27,13 @@ uv run main.py --rope steel --winch engine
 uv run main.py --gliders "ASK 21" LS4 --pull 1.0 --rope-length 1000 --wind 5
 uv run main.py --rope-file ropes/example_dyneema_6mm.toml    # rope from a datasheet
 uv run main.py --rope steel --rope-param mu=0.09 --rope-param EA=1.2e6
-uv run main.py --gliders "ASK 13" --sensitivity [--only rope] # d(height)/d(parameter)
+uv run main.py --gliders "ASK 13" --only rope   # sensitivity table: rope parameters only
 uv run pytest
 ```
 
-`main.py` prints a comparison table and writes plots to `results/`.
+`main.py` prints a comparison table, writes plots to `results/`, and prints the
+sensitivity of the release height to every parameter (CSV in `results/`;
+`--no-sensitivity` skips it).
 
 From Python:
 

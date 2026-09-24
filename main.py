@@ -6,7 +6,8 @@ Examples:
     uv run main.py --rope-length 1000 --wind 5 --out results
     uv run main.py --rope-file ropes/example_dyneema_6mm.toml
     uv run main.py --rope steel --rope-param mu=0.09 --rope-param EA=1.2e6
-    uv run main.py --gliders "ASK 13" --sensitivity  # d(release height)/d(parameter)
+    uv run main.py --gliders "ASK 13" --only rope    # sensitivity table: rope only
+    uv run main.py --no-sensitivity                  # skip the sensitivities
 """
 
 import argparse
@@ -18,8 +19,12 @@ from winch_sim import plots
 from winch_sim.cable import ROPES, load_rope, override_rope
 from winch_sim.gliders import CATALOGUE
 from winch_sim.params import Env, Launch
-from winch_sim.sensitivity import format_table, sensitivities, sensitivity_unit
-from winch_sim.simulate import solve_batch, summarize, time_series, unstack
+from winch_sim.sensitivity import (
+    batch_sensitivities,
+    format_table,
+    sensitivity_unit,
+)
+from winch_sim.simulate import T_MAX, solve_batch, summarize, time_series, unstack
 from winch_sim.winch import engine_winch, tension_winch
 
 # (summary key, header, format spec, scale)
@@ -61,6 +66,12 @@ def main() -> None:
     ap.add_argument("--wind", type=float, default=0.0, help="headwind at 10 m [m/s]")
     ap.add_argument("--segments", type=int, default=12, help="rope segments")
     ap.add_argument(
+        "--t-max",
+        type=float,
+        default=T_MAX,
+        help=f"give up if a launch has not ended after this many seconds ({T_MAX:g})",
+    )
+    ap.add_argument(
         "--rope-file", type=Path, help="rope from a TOML file (see ropes/*.toml)"
     )
     ap.add_argument(
@@ -71,11 +82,11 @@ def main() -> None:
         help="override a Rope field in SI units, e.g. mu=0.09 (repeatable)",
     )
     ap.add_argument(
-        "--sensitivity",
+        "--no-sensitivity",
         action="store_true",
-        help="print d(release height)/d(parameter) for every parameter",
+        help="skip d(release height)/d(parameter) (computed by default)",
     )
-    ap.add_argument("--top", type=int, default=25, help="rows in sensitivity table")
+    ap.add_argument("--top", type=int, default=15, help="rows in sensitivity table")
     ap.add_argument(
         "--only",
         nargs="+",
@@ -119,50 +130,14 @@ def main() -> None:
     a.out.mkdir(parents=True, exist_ok=True)
     tag = f"{rope_name}_{a.winch}"
 
-    if a.sensitivity:
-        for name, L in zip(a.gliders, launches, strict=True):
-            h, rows = sensitivities(L, n_segments=a.segments)
-            shown = rows
-            if a.only:
-                shown = [r for r in rows if r.name.startswith(tuple(a.only))]
-            print(f"=== {name} ===")
-            print(format_table(h, shown, a.top))
-            fn = a.out / f"sensitivity_{name.replace(' ', '_')}_{tag}.csv"
-            with open(fn, "w", newline="") as f:
-                w = csv.writer(f)
-                w.writerow(
-                    [
-                        "parameter",
-                        "value",
-                        "unit",
-                        "dh_dp",
-                        "dh_dp_unit",
-                        "dh_for_plus_10pct_m",
-                        "elasticity",
-                    ]
-                )
-                for r in rows:
-                    w.writerow(
-                        [
-                            r.name,
-                            f"{r.value:.6g}",
-                            r.unit,
-                            f"{r.dh_dp:.6g}",
-                            sensitivity_unit(r.unit),
-                            f"{r.dh_10pct:.6g}",
-                            f"{r.elasticity:.6g}",
-                        ]
-                    )
-            print(f"(all {len(rows)} parameters in {fn})\n")
-        return
-
-    sol = solve_batch(launches, n_segments=a.segments)
+    sol = solve_batch(launches, n_segments=a.segments, t_max=a.t_max)
 
     print(f"{'glider':10s}" + "".join(f"{h:>{W}s}" for _, h, _, _ in COLUMNS))
     runs = {}
+    summaries = {}
     for i, (name, L) in enumerate(zip(a.gliders, launches)):
         s_i = unstack(sol, i)
-        summ = summarize(L, s_i)
+        summ = summaries[name] = summarize(L, s_i)
         print(f"{name:10s}" + "".join(_cell(summ[k], f, sc) for k, _, f, sc in COLUMNS))
         runs[name] = time_series(L, s_i)
 
@@ -176,6 +151,53 @@ def main() -> None:
             fn, dpi=130
         )
     print(f"\nplots written to {a.out}/")
+
+    if a.no_sensitivity:
+        return
+    print("\nSensitivity of the release height (sorted by |elasticity|)")
+    results = batch_sensitivities(launches, n_segments=a.segments, t_max=a.t_max)
+    for (name, L), (h, rows) in zip(zip(a.gliders, launches), results, strict=True):
+        h_sim = summaries[name]["release_height"]
+        if abs(h - h_sim) > 0.01 * abs(h_sim) + 0.5:
+            print(
+                f"WARNING: sensitivity solve h = {h:.1f} m vs simulation {h_sim:.1f} m"
+            )
+        shown = rows
+        if a.only:
+            shown = [r for r in rows if r.name.startswith(tuple(a.only))]
+        print(f"\n=== {name} ===")
+        print(format_table(h, shown, a.top))
+        fn = a.out / f"sensitivity_{name.replace(' ', '_')}_{tag}.csv"
+        write_sensitivity_csv(fn, rows)
+        print(f"(all {len(rows)} parameters in {fn})")
+
+
+def write_sensitivity_csv(fn: Path, rows) -> None:
+    with open(fn, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(
+            [
+                "parameter",
+                "value",
+                "unit",
+                "dh_dp",
+                "dh_dp_unit",
+                "dh_for_plus_10pct_m",
+                "elasticity",
+            ]
+        )
+        for r in rows:
+            w.writerow(
+                [
+                    r.name,
+                    f"{r.value:.6g}",
+                    r.unit,
+                    f"{r.dh_dp:.6g}",
+                    sensitivity_unit(r.unit),
+                    f"{r.dh_10pct:.6g}",
+                    f"{r.elasticity:.6g}",
+                ]
+            )
 
 
 if __name__ == "__main__":

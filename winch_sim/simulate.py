@@ -19,6 +19,8 @@ from .dynamics import State, diagnostics, initial_state, make_args, vector_field
 from .params import Launch
 
 EVENTS = ("release", "back_release", "weak_link", "rope_in")
+T_MAX = 1.0e5  # [s] give up if the launch has not ended by then (~28 h)
+MAX_STEPS = 5_000_000
 
 
 def _info(t, y, args, name):
@@ -65,7 +67,7 @@ def _solver(name: str):
 class LaunchSolution(NamedTuple):
     ts: Array  # stage-1 save times
     ys: State
-    valid: Array  # ts <= release time
+    valid: Array  # usable save points (all, unless the solve failed)
     ts_post: Array  # stage-2 (free flight) save times
     ys_post: State
     t_release: Array
@@ -77,61 +79,79 @@ class LaunchSolution(NamedTuple):
 def solve_launch(
     launch: Launch,
     n_segments: int = 16,
-    t_max: float = 1000.0,
-    dt_save: float = 0.1,
+    t_max: float = T_MAX,
+    n_save: int = 2000,
     t_post: float = 8.0,
+    n_post: int = 200,
     solver: Literal["tsit5", "kvaerno5"] = "tsit5",
     rtol: float = 1e-6,
     atol: float = 1e-6,
-    max_steps: int = 500_000,
+    max_steps: int = MAX_STEPS,
 ) -> LaunchSolution:
+    """Simulate a launch.
+
+    Pass 1 runs to the end-of-launch event (or t_max) saving only the final state,
+    so t_max can be very large at no cost.  Pass 2 repeats the (deterministic) solve
+    from 0 to the release time and saves n_save evenly spaced points for plotting.
+    Stage 2 continues in free flight for t_post seconds (n_post points).
+    """
     args = make_args(launch, attached=1.0)
     y0 = initial_state(args, n_segments)
     term = dfx.ODETerm(vector_field)
     controller = step_controller(rtol, atol)
-    ts = jnp.arange(0.0, t_max, dt_save)
-    event = launch_event()
+    common = {
+        "stepsize_controller": controller,
+        "max_steps": max_steps,
+        "throw": False,
+        "dt0": 1e-3,
+    }
     sol = dfx.diffeqsolve(
         term,
         _solver(solver),
         t0=0.0,
         t1=t_max,
-        dt0=1e-3,
         y0=y0,
         args=args,
-        saveat=dfx.SaveAt(subs=[dfx.SubSaveAt(ts=ts), dfx.SubSaveAt(t1=True)]),
-        stepsize_controller=controller,
-        event=event,
-        max_steps=max_steps,
-        throw=False,
+        saveat=dfx.SaveAt(t1=True),
+        event=launch_event(),
+        **common,
     )
     assert sol.ts is not None and sol.ys is not None and sol.event_mask is not None
-    ys, ys_end = sol.ys
-    t_rel = sol.ts[1][0]
-    y_rel = jax.tree.map(lambda a: a[0], ys_end)
+    t_rel = sol.ts[0]
+    y_rel = jax.tree.map(lambda a: a[0], sol.ys)
     mask = jnp.stack(sol.event_mask)
     ev = jnp.where(mask.any(), jnp.argmax(mask), -1)
 
+    ts = jnp.linspace(0.0, t_rel, n_save)
+    sol_path = dfx.diffeqsolve(
+        term,
+        _solver(solver),
+        t0=0.0,
+        t1=t_rel,
+        y0=y0,
+        args=args,
+        saveat=dfx.SaveAt(ts=ts),
+        **common,
+    )
+    assert sol_path.ys is not None
+
     args_post = make_args(launch, attached=0.0)
-    ts_post = t_rel + jnp.arange(0.0, t_post, dt_save)
+    ts_post = t_rel + jnp.linspace(0.0, t_post, n_post)
     sol2 = dfx.diffeqsolve(
         term,
         _solver(solver),
         t0=t_rel,
         t1=t_rel + t_post,
-        dt0=1e-3,
         y0=y_rel,
         args=args_post,
         saveat=dfx.SaveAt(ts=ts_post),
-        stepsize_controller=controller,
-        max_steps=max_steps,
-        throw=False,
+        **common,
     )
     assert sol2.ys is not None
     return LaunchSolution(
         ts=ts,
-        ys=ys,
-        valid=ts <= t_rel,
+        ys=sol_path.ys,
+        valid=jnp.isfinite(ts),
         ts_post=ts_post,
         ys_post=sol2.ys,
         t_release=t_rel,

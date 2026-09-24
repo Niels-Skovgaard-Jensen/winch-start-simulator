@@ -21,21 +21,27 @@ import numpy as np
 
 from .dynamics import initial_state, make_args, vector_field
 from .params import DISPLAY_UNITS, Launch
-from .simulate import launch_event, step_controller
+from .simulate import (
+    MAX_STEPS,
+    T_MAX,
+    launch_event,
+    stack,
+    step_controller,
+    unstack,
+)
 
 CONTACT_POINTS = ("nose", "wheel", "tail")
 
 
-@eqx.filter_jit
-def release_height(
+def _release(
     launch: Launch,
-    n_segments: int = 12,
-    t_max: float = 200.0,
-    rtol: float = 1e-6,
-    atol: float = 1e-6,
-    max_steps: int = 20_000,
+    n_segments: int,
+    t_max: float,
+    rtol: float,
+    atol: float,
+    max_steps: int,
 ):
-    """Height above the rest position at the end of the launch (differentiable)."""
+    """(height above rest position at the end of the launch, launch ended?)"""
     args = make_args(launch, attached=1.0)
     y0 = initial_state(args, n_segments)
     sol = dfx.diffeqsolve(
@@ -52,8 +58,26 @@ def release_height(
         max_steps=max_steps,
         adjoint=dfx.RecursiveCheckpointAdjoint(),
     )
-    assert sol.ys is not None
-    return sol.ys.pos[-1, 1] - args.z_rest
+    assert sol.ys is not None and sol.event_mask is not None
+    ended = jnp.stack(sol.event_mask).any()
+    return sol.ys.pos[-1, 1] - args.z_rest, ended
+
+
+@eqx.filter_jit
+def release_height(
+    launch: Launch,
+    n_segments: int = 12,
+    t_max: float = T_MAX,
+    rtol: float = 1e-6,
+    atol: float = 1e-6,
+    max_steps: int = MAX_STEPS,
+):
+    """Height above the rest position at the end of the launch (differentiable).
+
+    Same solve as stage 1 of `simulate.solve_launch`; if no end-of-launch event
+    occurs before t_max, this is the height at t_max.
+    """
+    return _release(launch, n_segments, t_max, rtol, atol, max_steps)[0]
 
 
 def as_float_arrays(launch: Launch) -> Launch:
@@ -62,14 +86,16 @@ def as_float_arrays(launch: Launch) -> Launch:
 
 
 @eqx.filter_jit
-def height_and_gradient(launch: Launch, n_segments: int = 12, tol: float = 1e-8):
-    """Release height and d(height)/d(parameter) as a Launch-shaped pytree.
+def height_and_gradient(
+    launch: Launch, n_segments: int = 12, tol: float = 1e-8, t_max: float = T_MAX
+):
+    """((release height, launch ended?), d(height)/d(parameter) as a Launch pytree).
 
     The gradient is that of the discretised solve, so tiny sensitivities are only
     as accurate as the solver tolerance (rtol = atol = tol) allows.
     """
     f = eqx.filter_value_and_grad(
-        lambda L: release_height(L, n_segments, rtol=tol, atol=tol, max_steps=200_000)
+        lambda L: _release(L, n_segments, t_max, tol, tol, MAX_STEPS), has_aux=True
     )
     return f(as_float_arrays(launch))
 
@@ -104,25 +130,57 @@ def _walk(params, grads, prefix=""):
                 yield f"{name}[{lab}]", unit, float(pi), float(gi)
 
 
-def sensitivities(launch: Launch, n_segments: int = 12, tol: float = 1e-8):
+def _rows(launch: Launch, h: float, grads) -> list[Sensitivity]:
+    rows = [
+        Sensitivity(
+            name=name,
+            value=value,
+            unit=unit,
+            dh_dp=g,
+            dh_10pct=0.1 * value * g,
+            elasticity=value * g / h,
+        )
+        for name, unit, value, g in _walk(launch, grads)
+    ]
+    rows.sort(key=lambda r: (-abs(r.elasticity), -abs(r.dh_dp)))
+    return rows
+
+
+def _check_ended(ended, t_max: float) -> None:
+    if not bool(ended):
+        raise RuntimeError(
+            f"the launch did not end (no release/weak-link/rope-in event) within "
+            f"t_max = {t_max:g} s; sensitivities of the height at t_max would be "
+            f"meaningless. Increase t_max."
+        )
+
+
+def sensitivities(
+    launch: Launch, n_segments: int = 12, tol: float = 1e-8, t_max: float = T_MAX
+):
     """Release height [m] and Sensitivity rows, sorted by |elasticity| (largest first)."""
     launch = as_float_arrays(launch)
-    h, grads = height_and_gradient(launch, n_segments, tol)
-    h = float(h)
-    rows = []
-    for name, unit, value, g in _walk(launch, grads):
-        rows.append(
-            Sensitivity(
-                name=name,
-                value=value,
-                unit=unit,
-                dh_dp=g,
-                dh_10pct=0.1 * value * g,
-                elasticity=value * g / h,
-            )
-        )
-    rows.sort(key=lambda r: (-abs(r.elasticity), -abs(r.dh_dp)))
-    return h, rows
+    (h, ended), grads = height_and_gradient(launch, n_segments, tol, t_max)
+    _check_ended(ended, t_max)
+    return float(h), _rows(launch, float(h), grads)
+
+
+def batch_sensitivities(
+    launches: list[Launch],
+    n_segments: int = 12,
+    tol: float = 1e-8,
+    t_max: float = T_MAX,
+):
+    """`sensitivities` for many launches at once (one vmap-ed, compiled program)."""
+    launches = [as_float_arrays(L) for L in launches]
+    (h, ended), grads = jax.vmap(
+        lambda L: height_and_gradient(L, n_segments, tol, t_max)
+    )(stack(launches))
+    out = []
+    for i, L in enumerate(launches):
+        _check_ended(ended[i], t_max)
+        out.append((float(h[i]), _rows(L, float(h[i]), unstack(grads, i))))
+    return out
 
 
 def sensitivity_unit(unit: str) -> str:
