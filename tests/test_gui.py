@@ -62,3 +62,16 @@ def test_invalid_input_is_reported(window):
     with pytest.raises(ValueError, match="mu"):
         window.current_launch()
     window.rope_form.editors["mu"][0].set_value(0.016)
+
+
+def test_clear_and_restore_comparison(window):
+    if not window.runs:
+        window.add_run(
+            run_launch("c", window.current_launch(), Numerics(sensitivity=False))
+        )
+    window._set_all_compared(False)
+    assert window.compare_pane.canvas is None
+    assert window.compare_info.text().startswith("0 of")
+    window._set_all_compared(True)
+    assert window.compare_pane.canvas is not None
+    assert len(window.runs) >= 1  # clearing the comparison keeps the runs

@@ -529,8 +529,24 @@ class MainWindow(QtWidgets.QMainWindow):
         rl.addLayout(btns)
         self.results.addTab(runs, "Runs")
 
+        compare = QtWidgets.QWidget()
+        cl = QtWidgets.QVBoxLayout(compare)
+        cbtns = QtWidgets.QHBoxLayout()
+        self.compare_info = QtWidgets.QLabel()
+        clear = QtWidgets.QPushButton("Clear comparison")
+        clear.setToolTip(
+            "untick all runs (runs are kept; new runs are added to the comparison)"
+        )
+        clear.clicked.connect(lambda: self._set_all_compared(False))
+        select_all = QtWidgets.QPushButton("Compare all runs")
+        select_all.clicked.connect(lambda: self._set_all_compared(True))
+        cbtns.addWidget(self.compare_info, 1)
+        cbtns.addWidget(select_all)
+        cbtns.addWidget(clear)
+        cl.addLayout(cbtns)
         self.compare_pane = FigurePane()
-        self.results.addTab(self.compare_pane, "Comparison")
+        cl.addWidget(self.compare_pane, 1)
+        self.results.addTab(compare, "Comparison")
 
         detail = QtWidgets.QWidget()
         dl = QtWidgets.QVBoxLayout(detail)
@@ -816,6 +832,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.compare_pane.set_figure(
             plots.compare(chosen, "Comparison of checked runs") if chosen else None
         )
+        self.compare_info.setText(f"{len(chosen)} of {len(self.runs)} runs compared")
+        self.compare_pane.placeholder.setText(
+            "No runs selected: tick runs in the Runs tab or press 'Compare all runs'."
+            if self.runs
+            else "Run a simulation to see results here."
+        )
+
+    def _set_all_compared(self, on: bool):
+        state = QtCore.Qt.CheckState.Checked if on else QtCore.Qt.CheckState.Unchecked
+        t = self.runs_table
+        t.blockSignals(True)
+        for i in range(t.rowCount()):
+            t.item(i, 0).setCheckState(state)
+        t.blockSignals(False)
+        self._refresh_compare()
 
     def _show_detail(self, i: int):
         run = self._run_at(i)
