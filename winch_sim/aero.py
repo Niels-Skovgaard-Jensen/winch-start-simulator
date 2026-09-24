@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 
+from .atmosphere import density
 from .params import Env, Glider
 from .smooth import perp, safe_norm, soft_clip, softplus
 
@@ -14,7 +15,7 @@ def wind(env: Env, z):
 
 
 def air_data(g: Glider, env: Env, pos, vel, theta):
-    """Airspeed vector, airspeed, angle of attack and flight path angle."""
+    """Air-relative velocity, true airspeed, angle of attack and flight path angle."""
     va = vel - wind(env, pos[1])
     V = safe_norm(va, 1e-6)
     c, s = jnp.cos(theta), jnp.sin(theta)
@@ -41,7 +42,7 @@ def drag_coefficient(g: Glider, alpha, CL):
 def aero_forces(g: Glider, env: Env, pos, vel, theta, q, de):
     """Aerodynamic force (earth frame), pitching moment about the CG, and lift."""
     va, V, alpha, _ = air_data(g, env, pos, vel, theta)
-    qbar = 0.5 * env.rho * V**2
+    qbar = 0.5 * density(env, pos[1]) * V**2
     q_hat = q * g.chord / (2.0 * jnp.sqrt(V**2 + 1.0))
     CL = lift_coefficient(g, alpha, de, q_hat)
     CD = drag_coefficient(g, alpha, CL)

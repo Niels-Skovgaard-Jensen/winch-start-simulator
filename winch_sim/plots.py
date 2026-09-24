@@ -61,7 +61,7 @@ def compare(runs: Mapping[str, Series], title: str = "") -> Figure:
         _release_marker(ax_traj, s, s["x"], s["height"], c)
         ax_h.plot(t, s["height"], color=c, label=name)
         _release_marker(ax_h, s, t, s["height"], c)
-        ax_V.plot(t, s["V"] * 3.6, color=c, label=name)
+        ax_V.plot(t, s["V_ias"] * 3.6, color=c, label=name)
         att = s["released"] == 0
         ax_T.plot(t[att], s["T_hook"][att] / 1e3, color=c, label=name)
         ax_n.plot(t, s["n_wing"], color=c, label=name)
@@ -72,7 +72,7 @@ def compare(runs: Mapping[str, Series], title: str = "") -> Figure:
     )
     ax_traj.set_aspect("equal", adjustable="datalim")
     ax_h.set(title="Height", xlabel="time [s]", ylabel="m")
-    ax_V.set(title="Airspeed", xlabel="time [s]", ylabel="km/h")
+    ax_V.set(title="Indicated airspeed (IAS)", xlabel="time [s]", ylabel="km/h")
     ax_T.set(title="Cable tension at the hook", xlabel="time [s]", ylabel="kN")
     ax_n.set(title="Wing load factor  L / W", xlabel="time [s]", ylabel="–")
     ax_att.set(title="Pitch attitude", xlabel="time [s]", ylabel="deg")
@@ -114,13 +114,14 @@ def launch_detail(name: str, s: Series, n_snapshots: int = 8) -> Figure:
     ax_T.set(title="Rope tension", xlabel="time [s]", ylabel="kN")
     ax_T.legend()
 
-    ax_V.plot(t, s["V"] * 3.6, color=SERIES[0], label="airspeed")
+    ax_V.plot(t, s["V_ias"] * 3.6, color=SERIES[0], label="indicated airspeed")
+    ax_V.plot(t, s["V_tas"] * 3.6, color=SERIES[0], ls="--", label="true airspeed")
     ax_V.plot(t, s["v_reel"] * 3.6, color=SERIES[1], label="reel-in speed")
     ax_V.set(title="Speeds", xlabel="time [s]", ylabel="km/h")
     ax_V.legend()
 
     ax_ang.plot(t, np.degrees(s["theta"]), color=SERIES[0], label="pitch θ")
-    moving = s["V"] > 5.0  # alpha is meaningless while (nearly) standing still
+    moving = s["V_tas"] > 5.0  # alpha is meaningless while (nearly) standing still
     alpha = np.where(moving, np.degrees(s["alpha"]), np.nan)
     ax_ang.plot(t, alpha, color=SERIES[1], label="angle of attack α")
     ax_ang.plot(

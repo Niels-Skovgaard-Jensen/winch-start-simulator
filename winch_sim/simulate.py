@@ -18,7 +18,9 @@ from jax import Array
 from .dynamics import State, diagnostics, initial_state, make_args, vector_field
 from .params import Launch
 
-EVENTS = ("release", "back_release", "weak_link", "rope_in")
+EVENTS = ("release", "back_release", "weak_link", "rope_in", "no_liftoff")
+LAUNCH_END_EVENTS = 4  # the first four end a launch; no_liftoff means it failed
+T_LIFTOFF_MAX = 120.0  # [s] no lift-off by then -> give up (e.g. rope too heavy)
 T_MAX = 1.0e5  # [s] give up if the launch has not ended by then (~28 h)
 MAX_STEPS = 5_000_000
 
@@ -43,10 +45,20 @@ def _ev_rope_in(t, y, args, **kw):
     return 30.0 - y.L0
 
 
+def _ev_no_liftoff(t, y, args, **kw):
+    return (t > T_LIFTOFF_MAX) & (y.pos[1] - args.z_rest < 1.0)
+
+
 def launch_event() -> dfx.Event:
     """End-of-launch events (see EVENTS), located exactly by root finding."""
     return dfx.Event(
-        cond_fn=[_ev_release, _ev_back_release, _ev_weak_link, _ev_rope_in],
+        cond_fn=[
+            _ev_release,
+            _ev_back_release,
+            _ev_weak_link,
+            _ev_rope_in,
+            _ev_no_liftoff,
+        ],
         root_finder=optx.Newton(rtol=1e-8, atol=1e-8),
         direction=True,
     )
@@ -182,9 +194,13 @@ def summarize(launch: Launch, sol: LaunchSolution) -> dict[str, float | str]:
         "release_height": float(y_end.pos[1] - z_rest),
         "release_time": float(sol.t_release),
         "ground_roll": float(d["x"][np.argmax(d["height"] > 0.5)]),
-        "max_V_kmh": float(d["V"].max() * 3.6),
+        "max_V_ias_kmh": float(d["V_ias"].max() * 3.6),
+        "max_V_tas_kmh": float(d["V_tas"].max() * 3.6),
         "V_W_kmh": float(launch.glider.V_W) * 3.6,
-        "min_V_air_kmh": float(d["V"][airborne].min() * 3.6) if airborne.any() else 0.0,
+        "min_V_ias_kmh": (
+            float(d["V_ias"][airborne].min() * 3.6) if airborne.any() else 0.0
+        ),
+        "rho_release": float(d["rho"][-1]),
         "max_T_hook": float(d["T_hook"].max()),
         "max_T_winch": float(d["T_winch"].max()),
         "rope_safety_factor": float(launch.rope.breaking_load)
@@ -194,6 +210,11 @@ def summarize(launch: Launch, sol: LaunchSolution) -> dict[str, float | str]:
         "rope_used": float(d["L0"][0] - d["L0"][-1]),
         "num_steps": int(sol.num_steps),
     }
+
+
+def n_segments_for(rope_length: float, per_km: float, minimum: int = 4) -> int:
+    """Rope discretisation from a resolution in segments per km of laid-out rope."""
+    return max(minimum, round(float(rope_length) / 1000.0 * per_km))
 
 
 def time_series(launch: Launch, sol: LaunchSolution) -> dict[str, np.ndarray]:

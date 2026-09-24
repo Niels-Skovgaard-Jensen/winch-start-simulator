@@ -24,7 +24,16 @@ from winch_sim.sensitivity import (
     format_table,
     sensitivity_unit,
 )
-from winch_sim.simulate import T_MAX, solve_batch, summarize, time_series, unstack
+from winch_sim.simulate import (
+    EVENTS,
+    LAUNCH_END_EVENTS,
+    T_MAX,
+    n_segments_for,
+    solve_batch,
+    summarize,
+    time_series,
+    unstack,
+)
 from winch_sim.winch import engine_winch, tension_winch
 
 # (summary key, header, format spec, scale)
@@ -33,9 +42,10 @@ COLUMNS = [
     ("release_height", "h_rel m", ".0f", 1.0),
     ("release_time", "t_rel s", ".1f", 1.0),
     ("ground_roll", "roll m", ".0f", 1.0),
-    ("max_V_kmh", "Vmax km/h", ".0f", 1.0),
-    ("V_W_kmh", "V_W km/h", ".0f", 1.0),
-    ("min_V_air_kmh", "Vmin km/h", ".0f", 1.0),
+    ("max_V_ias_kmh", "Vmax IAS", ".0f", 1.0),
+    ("V_W_kmh", "V_W IAS", ".0f", 1.0),
+    ("min_V_ias_kmh", "Vmin IAS", ".0f", 1.0),
+    ("max_V_tas_kmh", "Vmax TAS", ".0f", 1.0),
     ("max_T_hook", "Tmax kN", ".2f", 1e-3),
     ("max_n", "n max", ".2f", 1.0),
     ("max_power_kW", "P max kW", ".0f", 1.0),
@@ -64,7 +74,18 @@ def main() -> None:
     )
     ap.add_argument("--rope-length", type=float, default=1200.0)
     ap.add_argument("--wind", type=float, default=0.0, help="headwind at 10 m [m/s]")
-    ap.add_argument("--segments", type=int, default=12, help="rope segments")
+    ap.add_argument(
+        "--segments-per-km",
+        type=float,
+        default=10.0,
+        help="rope resolution: segments per km of laid-out rope (min. 4 segments)",
+    )
+    ap.add_argument(
+        "--field-elevation", type=float, default=0.0, help="airfield height AMSL [m]"
+    )
+    ap.add_argument(
+        "--isa-dt", type=float, default=0.0, help="temperature offset from ISA [K]"
+    )
     ap.add_argument(
         "--t-max",
         type=float,
@@ -115,7 +136,11 @@ def main() -> None:
                 rope=rope,
                 winch=w,
                 pilot=pilot,
-                env=Env(wind_ref=a.wind),
+                env=Env(
+                    wind_ref=a.wind,
+                    field_elevation=a.field_elevation,
+                    isa_dT=a.isa_dt,
+                ),
                 rope_length=a.rope_length,
                 slack=0.002,
             )
@@ -127,10 +152,16 @@ def main() -> None:
         f"breaking load {rope.breaking_load / 1e3:.1f} kN), "
         f"winch: {a.winch} ({a.pull} x weight), headwind {a.wind} m/s\n"
     )
+    n_seg = n_segments_for(a.rope_length, a.segments_per_km)
+    print(
+        f"field {a.field_elevation:.0f} m AMSL, ISA{a.isa_dt:+.0f} K, "
+        f"rope model: {n_seg} segments ({a.segments_per_km:g}/km, "
+        f"{a.rope_length / n_seg:.0f} m each); speeds in km/h\n"
+    )
     a.out.mkdir(parents=True, exist_ok=True)
     tag = f"{rope_name}_{a.winch}"
 
-    sol = solve_batch(launches, n_segments=a.segments, t_max=a.t_max)
+    sol = solve_batch(launches, n_segments=n_seg, t_max=a.t_max)
 
     print(f"{'glider':10s}" + "".join(f"{h:>{W}s}" for _, h, _, _ in COLUMNS))
     runs = {}
@@ -155,8 +186,16 @@ def main() -> None:
     if a.no_sensitivity:
         return
     print("\nSensitivity of the release height (sorted by |elasticity|)")
-    results = batch_sensitivities(launches, n_segments=a.segments, t_max=a.t_max)
-    for (name, L), (h, rows) in zip(zip(a.gliders, launches), results, strict=True):
+    ok = [summaries[n]["event"] in EVENTS[:LAUNCH_END_EVENTS] for n in a.gliders]
+    for name, good in zip(a.gliders, ok, strict=True):
+        if not good:
+            print(f"(skipping {name}: launch ended with {summaries[name]['event']})")
+    names = [n for n, good in zip(a.gliders, ok, strict=True) if good]
+    launches = [L for L, good in zip(launches, ok, strict=True) if good]
+    if not launches:
+        return
+    results = batch_sensitivities(launches, n_segments=n_seg, t_max=a.t_max)
+    for (name, L), (h, rows) in zip(zip(names, launches), results, strict=True):
         h_sim = summaries[name]["release_height"]
         if abs(h - h_sim) > 0.01 * abs(h_sim) + 0.5:
             print(

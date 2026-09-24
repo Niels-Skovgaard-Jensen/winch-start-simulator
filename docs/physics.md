@@ -81,12 +81,41 @@ $\mathbf F_\text{hook}$.
 
 Air-relative velocity $\mathbf v_a = \mathbf v - \mathbf w(z)$ with a power-law wind
 profile $\mathbf w = (-W_{10}\,(z/10)^{1/7},\,0)$ (headwind blows towards $-x$).
-Airspeed $V = |\mathbf v_a|$, and
+True airspeed $V = |\mathbf v_a|$, and
 
 $$
 \alpha = \operatorname{atan2}(-\mathbf v_a\cdot\hat{\mathbf z}_b,\ \mathbf v_a\cdot\hat{\mathbf x}_b),
-\qquad \bar q = \tfrac12\rho V^2,\qquad \hat q = \frac{q\,\bar c}{2V}.
+\qquad \bar q = \tfrac12\rho(z) V^2,\qquad \hat q = \frac{q\,\bar c}{2V}.
 $$
+
+**Air density** follows the International Standard Atmosphere (`atmosphere.py`)
+at the pressure height $h = h_\text{field} + z$, with a temperature offset
+$\Delta T$ (`Env.field_elevation`, `Env.isa_dT`, CLI `--field-elevation`,
+`--isa-dt`):
+
+$$
+T = T_0 - \lambda h + \Delta T,\qquad p = p_0\Big(\frac{T_0 - \lambda h}{T_0}\Big)^{g_0/(R\lambda)},
+\qquad \rho = \frac{p}{R\,T}
+$$
+
+($T_0$ = 288.15 K, $p_0$ = 101325 Pa, $\lambda$ = 6.5 K/km; isothermal above
+11 km). The same $\rho(z)$ is used for the glider, for every rope segment (at
+its mid-height) and for the parachute. At 3000 m, $\rho$ is 26 % lower than at
+sea level.
+
+**Indicated vs true airspeed.** Instruments, placards and pilots use indicated
+airspeed. Neglecting instrument error and compressibility, it equals the
+equivalent airspeed:
+
+$$
+V_\text{IAS} = V\sqrt{\rho(z)/\rho_0},\qquad \rho_0 = 1.225\ \text{kg/m}^3 .
+$$
+
+Stall and the aerodynamic loads depend on $\bar q$, i.e. on IAS. The pilot's
+target speed and the winch speed limit $V_W$ are therefore IAS values, while the
+kinematics use TAS. Summaries report max/min IAS (against $V_W$ and stall) and
+max TAS. On a hot, high airfield the glider needs more TAS, i.e. a longer ground
+roll, for the same IAS.
 
 Coefficients (the fuselage-referenced $C_{L0}$ contains the wing incidence):
 
@@ -163,6 +192,12 @@ the number of states stays fixed, which JAX needs. The price is a small inconsis
 in momentum bookkeeping (mass leaves every node instead of only at the drum); it
 vanishes as $N \to \infty$ and the test suite checks that the release height
 converges with $N$ (12 vs 24 segments differ by < 2 %).
+
+The resolution is set in **segments per km** of laid-out rope
+(`--segments-per-km`, default 10, i.e. 100 m segments, minimum 4 segments), so
+short and long ropes are discretised alike. Too coarse a rope is badly wrong for
+long ropes: 50 km of Dyneema gave ~3000 m release height at 20 segments but
+2170 m at 500 segments (10/km).
 
 ### 3.2 Segment tension
 
@@ -260,6 +295,28 @@ These are generic, approximate values. A specific rope can be given in three way
 The breaking load does not affect the dynamics. It is used to report the rope safety
 factor $F_\text{break}/\max T$ in the summary table.
 
+### 3.8 Long ropes: why the hook tension does not grow
+
+Rope weight enters the tension balance through height, not length. Along a
+hanging rope, $dT/dz = \mu g$ (plus drag), so the hook feels at most the tension
+at the rope's lowest point plus $\mu g\,\Delta z$ (0.16 N/m × 3000 m ≈ 0.5 kN
+for Dyneema). The remaining rope weight rests on the winch end, the sag, or the
+ground. What a long rope does is **eat** tension between winch and hook: friction
+of the part still lying on the grass ($\mu_g\, m_\text{rope} g$) and drag of
+the long airborne part. ASK 21, engine winch, 10 segments/km:
+
+| rope | length | rope mass | release height | max T winch | max T hook | rope on ground at 60 % of height |
+|---|---|---|---|---|---|---|
+| Dyneema | 1.2 km | 19 kg | 450 m | 6.2 kN | 6.1 kN | 0 % |
+| Dyneema | 10 km | 160 kg | 2353 m | 5.6 kN | 4.8 kN | 5 % |
+| Dyneema | 50 km | 800 kg | 2169 m | 5.6 kN | 2.9 kN | 81 % |
+| steel | 10 km | 800 kg | 1500 m | 8.6 kN | 6.0 kN | 29 % |
+| steel | 50 km | 4000 kg | no lift-off | 6.9 kN | 0.2 kN | 100 % |
+
+Beyond some length, extra rope only adds drag and friction: the 50 km Dyneema
+launch goes *lower* than the 10 km one. The 50 km steel rope (4 t, ~20 kN of
+friction on grass) cannot be dragged by this winch at all.
+
 ## 4. Winch
 
 Both winch models share one equation for the drum, lumped as an effective mass
@@ -297,7 +354,7 @@ $$
 
 * ground roll: rest attitude + 3° of back stick ($\theta_g$),
 * rotation into the climb between 2 and 30 m height ($s_\text{rot}$, smoothstep),
-* climb attitude 35–40°, raised when faster than the target speed, lowered when slower,
+* climb attitude 35–40°, raised when faster than the target speed (IAS), lowered when slower,
 * nose lowered to 5° as $\beta$ goes from 55° to 70° ($s_\text{top}$),
 * after release: glide attitude 0°.
 
@@ -322,6 +379,7 @@ The launch ends at the first of:
 | `back_release` | cable more than 110° below the fuselage axis (hook back-release) |
 | `weak_link` | hook tension exceeds the glider's weak-link rating |
 | `rope_in` | less than 30 m of rope left out |
+| `no_liftoff` | still on the ground after 120 s (e.g. rope too heavy to drag); a failed launch, no sensitivities |
 
 ## 7. Solving it with diffrax
 

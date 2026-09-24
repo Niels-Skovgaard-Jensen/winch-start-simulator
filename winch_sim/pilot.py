@@ -7,17 +7,17 @@ from .params import Pilot
 from .smooth import smoothstep, soft_clip
 
 
-def attitude_reference(p: Pilot, theta_rest, height, V, beta, attached):
+def attitude_reference(p: Pilot, theta_rest, height, V_ias, beta, attached):
     """Pitch attitude the pilot aims for, as a smooth function of the flight state.
 
     ground roll -> gradual rotation with height -> climb attitude (trimmed with the
-    airspeed error) -> lower the nose as the glider gets high over the winch;
+    indicated-airspeed error) -> lower the nose as the glider gets high over the winch;
     after release: glide attitude.
     """
     s_rot = smoothstep((height - p.h_rot0) / (p.h_rot1 - p.h_rot0))
     s_top = smoothstep((beta - p.top_beta0) / (p.top_beta1 - p.top_beta0))
     # Too fast -> raise the nose (active as soon as airborne), too slow -> lower it.
-    speed_trim = p.K_V * soft_clip(V - p.V_target, -4.0, 2.0, 1.0)
+    speed_trim = p.K_V * soft_clip(V_ias - p.V_target, -4.0, 2.0, 1.0)
     speed_trim = speed_trim * airborne_factor(height)
     theta_ground = theta_rest + p.theta_liftoff
     theta_climb = theta_ground + s_rot * (p.theta_climb - theta_ground) + speed_trim

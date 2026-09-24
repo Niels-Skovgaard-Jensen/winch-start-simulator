@@ -15,6 +15,7 @@ import numpy as np
 from jax import Array
 
 from .aero import wind
+from .atmosphere import density
 from .ground import contact_force
 from .params import Env, Rope
 from .smooth import safe_norm, softplus
@@ -154,7 +155,7 @@ def rope_forces(
     v_rel = 0.5 * (V[1:] + V[:-1]) - wind(env, mid[:, 1])
     v_t = jnp.sum(v_rel * e, axis=-1, keepdims=True) * e
     v_n = v_rel - v_t
-    qd = 0.5 * env.rho * rope.diameter * ell[:, None]
+    qd = 0.5 * density(env, mid[:, 1])[:, None] * rope.diameter * ell[:, None]
     F_drag = -qd * (
         rope.CDn * safe_norm(v_n)[:, None] * v_n
         + rope.Cf * jnp.pi * safe_norm(v_t)[:, None] * v_t
@@ -173,7 +174,13 @@ def rope_forces(
     # Hook: top segment tension, half the top segment's drag, parachute drag, and the
     # weight of the rope end assembly.
     v_rel_hook = hook_vel - wind(env, hook_pos[1])
-    F_chute = -0.5 * env.rho * rope.end_CdA * safe_norm(v_rel_hook) * v_rel_hook
+    F_chute = (
+        -0.5
+        * density(env, hook_pos[1])
+        * rope.end_CdA
+        * safe_norm(v_rel_hook)
+        * v_rel_hook
+    )
     end_mass = rope.end_mass + 0.5 * m_node
     hook_force = attached * (
         -T[-1] * e[-1]

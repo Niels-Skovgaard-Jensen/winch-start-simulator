@@ -22,6 +22,7 @@ import numpy as np
 from .dynamics import initial_state, make_args, vector_field
 from .params import DISPLAY_UNITS, Launch
 from .simulate import (
+    LAUNCH_END_EVENTS,
     MAX_STEPS,
     T_MAX,
     launch_event,
@@ -59,7 +60,7 @@ def _release(
         adjoint=dfx.RecursiveCheckpointAdjoint(),
     )
     assert sol.ys is not None and sol.event_mask is not None
-    ended = jnp.stack(sol.event_mask).any()
+    ended = jnp.stack(sol.event_mask)[:LAUNCH_END_EVENTS].any()
     return sol.ys.pos[-1, 1] - args.z_rest, ended
 
 
@@ -149,9 +150,9 @@ def _rows(launch: Launch, h: float, grads) -> list[Sensitivity]:
 def _check_ended(ended, t_max: float) -> None:
     if not bool(ended):
         raise RuntimeError(
-            f"the launch did not end (no release/weak-link/rope-in event) within "
-            f"t_max = {t_max:g} s; sensitivities of the height at t_max would be "
-            f"meaningless. Increase t_max."
+            f"the launch did not end normally (no release/weak-link/rope-in event "
+            f"within t_max = {t_max:g} s, or no lift-off within 120 s); "
+            f"sensitivities of its height would be meaningless."
         )
 
 

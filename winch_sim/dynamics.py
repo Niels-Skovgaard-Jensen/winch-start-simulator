@@ -5,6 +5,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from . import aero, cable, pilot, winch
+from .atmosphere import density, indicated_airspeed
 from .gliders import rest_attitude
 from .ground import contact_force
 from .params import Launch
@@ -118,10 +119,11 @@ def evaluate(t, y: State, args: Args):
 
     # Pilot
     height = y.pos[1] - args.z_rest
-    _, V, alpha, gamma = aero.air_data(g, env, y.pos, y.vel, y.theta)
+    _, V_tas, alpha, gamma = aero.air_data(g, env, y.pos, y.vel, y.theta)
+    V_ias = indicated_airspeed(env, y.pos[1], V_tas)  # what the pilot flies
     beta = winch_elevation(args, y)
     theta_ref = pilot.attitude_reference(
-        L.pilot, args.theta_rest, height, V, beta, attached
+        L.pilot, args.theta_rest, height, V_ias, beta, attached
     )
     de_dot, e_dot = pilot.elevator_rates(
         L.pilot,
@@ -164,7 +166,9 @@ def evaluate(t, y: State, args: Args):
         "x": y.pos[0],
         "z": y.pos[1],
         "height": height,
-        "V": V,
+        "V_tas": V_tas,
+        "V_ias": V_ias,
+        "rho": density(env, y.pos[1]),
         "alpha": alpha,
         "gamma": gamma,
         "theta": y.theta,

@@ -77,7 +77,7 @@ class Glider(eqx.Module):
     contact_mu: Array = unit("-")  # friction coefficient
 
     # Operating limits
-    V_W: float | Array = unit("m/s", display="km/h")  # max winch-launch airspeed
+    V_W: float | Array = unit("m/s", display="km/h")  # max winch-launch speed (IAS)
     weak_link: float | Array = unit("N", display="kN")  # weak link breaking load
 
 
@@ -137,7 +137,7 @@ class Pilot(eqx.Module):
     )  # back-stick on the ground roll: attitude above rest
     h_rot0: float | Array = unit("m")  # height at which rotation into the climb starts
     h_rot1: float | Array = unit("m")  # height at which full climb attitude is reached
-    V_target: float | Array = unit("m/s", display="km/h")  # target climb airspeed
+    V_target: float | Array = unit("m/s", display="km/h")  # target climb speed (IAS)
     K_V: float | Array = unit("rad s/m")  # attitude trim per airspeed error
     theta_top: float | Array = unit(
         "rad"
@@ -161,7 +161,8 @@ class Pilot(eqx.Module):
 
 
 class Env(eqx.Module):
-    rho: float | Array = unit("kg/m^3", 1.225)  # air density
+    field_elevation: float | Array = unit("m", 0.0)  # airfield height above MSL
+    isa_dT: float | Array = unit("K", 0.0)  # temperature offset from ISA
     g: float | Array = unit("m/s^2", 9.81)
     wind_ref: float | Array = unit("m/s", 0.0)  # headwind at 10 m height
     wind_exp: float | Array = unit("-", 1.0 / 7.0)  # power-law shear exponent
