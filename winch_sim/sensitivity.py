@@ -11,7 +11,6 @@ mass does not change a winch pull that was preset as "1.1 x weight".
 """
 
 import dataclasses
-import math
 from typing import NamedTuple
 
 import diffrax as dfx
@@ -21,7 +20,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from .dynamics import initial_state, make_args, vector_field
-from .params import Launch
+from .params import DISPLAY_UNITS, Launch
 from .simulate import launch_event, step_controller
 
 CONTACT_POINTS = ("nose", "wheel", "tail")
@@ -85,15 +84,18 @@ class Sensitivity(NamedTuple):
 
 
 def _walk(params, grads, prefix=""):
-    """Yield (name, unit, value, gradient) for every scalar parameter."""
+    """Yield (name, unit, value, gradient) for every scalar parameter, converted to
+    the parameter's display unit (value in display units, gradient per display unit).
+    """
     for f in dataclasses.fields(params):
         p, g = getattr(params, f.name), getattr(grads, f.name)
         name = f"{prefix}{f.name}"
         if dataclasses.is_dataclass(p):
             yield from _walk(p, g, name + ".")
             continue
-        unit = f.metadata.get("unit", "?")
-        p, g = np.asarray(p, float), np.asarray(g, float)
+        unit = f.metadata.get("display", f.metadata.get("unit", "?"))
+        scale = DISPLAY_UNITS.get(unit, 1.0)
+        p, g = np.asarray(p, float) / scale, np.asarray(g, float) * scale
         if p.ndim == 0:
             yield name, unit, float(p), float(g)
         else:
@@ -109,8 +111,6 @@ def sensitivities(launch: Launch, n_segments: int = 12, tol: float = 1e-8):
     h = float(h)
     rows = []
     for name, unit, value, g in _walk(launch, grads):
-        if unit == "rad":  # report angles in degrees
-            unit, value, g = "deg", math.degrees(value), g * math.pi / 180.0
         rows.append(
             Sensitivity(
                 name=name,

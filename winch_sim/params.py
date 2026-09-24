@@ -12,14 +12,31 @@ Conventions (see docs/physics.md):
 """
 
 import dataclasses
+import math
 
 import equinox as eqx
 from jax import Array
 
 
-def unit(u: str, default=dataclasses.MISSING):
-    """Dataclass field carrying its physical unit as metadata ('-' = dimensionless)."""
-    return eqx.field(default=default, metadata={"unit": u})
+def unit(u: str, default=dataclasses.MISSING, display: str | None = None):
+    """Dataclass field carrying its SI unit as metadata ('-' = dimensionless).
+
+    `display` is the unit used when reporting the parameter (e.g. "mm" for a rope
+    diameter stored in m); see DISPLAY_UNITS.
+    """
+    meta = {"unit": u, "display": display or DEFAULT_DISPLAY.get(u, u)}
+    return eqx.field(default=default, metadata=meta)
+
+
+# display unit -> size of one display unit in SI
+DISPLAY_UNITS = {
+    "mm": 1e-3,
+    "kN": 1e3,
+    "kW": 1e3,
+    "km/h": 1 / 3.6,
+    "deg": math.pi / 180,
+}
+DEFAULT_DISPLAY = {"rad": "deg", "W": "kW"}
 
 
 class Glider(eqx.Module):
@@ -60,17 +77,17 @@ class Glider(eqx.Module):
     contact_mu: Array = unit("-")  # friction coefficient
 
     # Operating limits
-    V_W: float | Array = unit("m/s")  # max winch-launch airspeed
-    weak_link: float | Array = unit("N")  # weak link breaking load
+    V_W: float | Array = unit("m/s", display="km/h")  # max winch-launch airspeed
+    weak_link: float | Array = unit("N", display="kN")  # weak link breaking load
 
 
 class Rope(eqx.Module):
     """Winch cable: lumped-mass elastic rope with weight and aerodynamic drag."""
 
-    diameter: float | Array = unit("m")
+    diameter: float | Array = unit("m", display="mm")
     mu: float | Array = unit("kg/m")  # mass per unit length
-    EA: float | Array = unit("N")  # axial stiffness
-    breaking_load: float | Array = unit("N")  # minimum breaking load
+    EA: float | Array = unit("N", display="kN")  # axial stiffness
+    breaking_load: float | Array = unit("N", display="kN")  # minimum breaking load
     zeta: float | Array = unit("-")  # damping ratio of one segment's axial mode
     CDn: float | Array = unit("-")  # normal (cross-flow) drag coefficient
     Cf: float | Array = unit("-")  # tangential skin-friction coefficient
@@ -95,7 +112,7 @@ class Winch(eqx.Module):
     """
 
     F_max: float | Array = unit(
-        "N"
+        "N", display="kN"
     )  # max pull at low speed (torque limit / drum radius)
     P_max: float | Array = unit("W")  # max power at the drum
     throttle: float | Array = unit("-")  # driver's throttle setting (0..1)
@@ -120,7 +137,7 @@ class Pilot(eqx.Module):
     )  # back-stick on the ground roll: attitude above rest
     h_rot0: float | Array = unit("m")  # height at which rotation into the climb starts
     h_rot1: float | Array = unit("m")  # height at which full climb attitude is reached
-    V_target: float | Array = unit("m/s")  # target climb airspeed
+    V_target: float | Array = unit("m/s", display="km/h")  # target climb airspeed
     K_V: float | Array = unit("rad s/m")  # attitude trim per airspeed error
     theta_top: float | Array = unit(
         "rad"

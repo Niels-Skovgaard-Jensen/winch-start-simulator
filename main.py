@@ -145,12 +145,12 @@ def main() -> None:
                     w.writerow(
                         [
                             r.name,
-                            r.value,
+                            f"{r.value:.6g}",
                             r.unit,
-                            r.dh_dp,
+                            f"{r.dh_dp:.6g}",
                             sensitivity_unit(r.unit),
-                            r.dh_10pct,
-                            r.elasticity,
+                            f"{r.dh_10pct:.6g}",
+                            f"{r.elasticity:.6g}",
                         ]
                     )
             print(f"(all {len(rows)} parameters in {fn})\n")
