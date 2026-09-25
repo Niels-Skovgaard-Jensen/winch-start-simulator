@@ -18,12 +18,6 @@ Simulator for glider winch launches, written in JAX and solved with
   indicated vs true airspeed
 * catalogue of gliders: Ka 8, ASK 13, LS4, ASK 21, ASG 29, DG-1000 (approximate data)
 
-![Launch geometry](docs/images/launch_geometry.png)
-
-*The glider climbs on a rope that sags under its own weight and drag, so at the
-hook it pulls more steeply downwards than the straight line to the winch
-(β = elevation seen from the winch).*
-
 The physics and the numerical approach are written up in Typst in
 [`docs/physics.typ`](docs/physics.typ) (bibliography in `docs/refs.yml`). Build the
 PDF with
