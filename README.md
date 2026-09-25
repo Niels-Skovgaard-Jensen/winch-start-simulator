@@ -1,4 +1,4 @@
-# whinch-simulator
+# winch-simulator
 
 Simulator for glider winch launches, written in JAX and solved with
 [diffrax](https://docs.kidger.site/diffrax/).
