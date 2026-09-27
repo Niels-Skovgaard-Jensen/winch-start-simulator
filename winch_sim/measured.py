@@ -16,8 +16,11 @@ spikes stay below that.
 
 Plain CSV files load too: a time column in seconds (`t`, `time`, `time_s`) and a
 force column in N (`force_n`, `force`, `tension`, `T_hook`) or kN (`force_kn`).
-Lines starting with `#` are comments; `# unloaded_level_n: 80.5` gives the unloaded
-level (sensor offset) instead of estimating it (see scripts/extract_launches.py).
+Lines starting with `#` are comments.  `# key: value` lines are metadata:
+`unloaded_level_n` gives the unloaded level (sensor offset) instead of estimating
+it (see scripts/extract_launches.py), and the launch conditions (CONDITIONS, e.g.
+`# glider: ASK 13`, `# rope_length_m: 1050`) let the GUI set up a matching
+simulation.
 """
 
 import csv
@@ -38,6 +41,13 @@ BASELINE_WINDOW_S = 600.0  # rolling window for the unloaded level...
 BASELINE_BIN_S = 5.0  # ...computed from medians over bins this long
 PAD_S = 30.0  # context kept before the pull and after the tension has settled
 OFFSET_KEY = "unloaded_level_n"  # metadata: known unloaded level [N]
+CONDITIONS = {  # metadata key -> type: the launch conditions, if recorded
+    "glider": str,  # catalogue name
+    "rope": str,  # rope preset
+    "winch": str,  # winch preset
+    "rope_length_m": float,
+    "headwind_m_s": float,  # at 10 m
+}
 
 TIME_COLUMNS = ("time_utc", "time", "timestamp", "t", "time_s")
 FORCE_COLUMNS = {  # column name -> N per unit
@@ -71,6 +81,7 @@ class Measurement:
     start_recorded: bool  # False if the log only starts during the launch
     clock: str  # logger clock at the start of the pull, for display
     shift: float = 0.0  # [s] manual time shift, added when lining up
+    meta: dict[str, str] = dataclasses.field(default_factory=dict)  # `# key: value`
 
     @property
     def duration(self) -> float:
@@ -80,6 +91,22 @@ class Measurement:
     def tension(self, zero: bool = True) -> np.ndarray:
         """Tension [N], with the sensor offset subtracted if `zero`."""
         return self.force - self.offset if zero else self.force
+
+    @property
+    def glider(self) -> str:
+        return self.meta.get("glider", "")
+
+    @property
+    def label(self) -> str:
+        return f"{self.name} ({self.glider})" if self.glider else self.name
+
+    def conditions(self) -> dict[str, str | float]:
+        """The recorded launch conditions (CONDITIONS keys only)."""
+        out: dict[str, str | float] = {}
+        for key, kind in CONDITIONS.items():
+            if key in self.meta:
+                out[key] = kind(self.meta[key])
+        return out
 
 
 def parse_times(values: list[str]) -> tuple[np.ndarray, bool]:
@@ -252,6 +279,8 @@ def load_launches(path: Path | str) -> list[Measurement]:
         log.is_clock,
         offset=None if level is None else float(level),
     )
+    for m in launches:
+        m.meta = dict(log.meta)
     if not launches:
         raise ValueError(
             f"{path.name}: no launch found (no stretch more than "
@@ -302,5 +331,5 @@ def line_up(m: Measurement, mode: str = "release", ref: Series | None = None):
 def traces(
     measurements, mode: str = "release", ref: Series | None = None, zero: bool = True
 ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    """{name: (lined-up time [s], tension [N])} for plots.compare / launch_detail."""
-    return {m.name: (line_up(m, mode, ref), m.tension(zero)) for m in measurements}
+    """{label: (lined-up time [s], tension [N])} for plots.compare / launch_detail."""
+    return {m.label: (line_up(m, mode, ref), m.tension(zero)) for m in measurements}

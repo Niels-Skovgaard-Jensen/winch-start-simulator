@@ -8,8 +8,13 @@ to <out>/<log file>_<HHMMSS>.csv (logger clock at the start of the pull): the lo
 rows unchanged, from CONTEXT_S before the pull to CONTEXT_S after the tension has
 settled.  Comment lines on top record the source and the unloaded level of the full
 log (the sensor offset), which a short cut-out may not show: the radio link often
-drops out while the rope end is on the ground.  The GUI (File -> Import measured
-tension) and `main.py --measured` read these files like the full logs.
+drops out while the rope end is on the ground.  `--meta KEY=VALUE` adds more such
+lines, e.g. the launch conditions (see winch_sim.measured.CONDITIONS):
+
+    --meta rope=dyneema --meta winch=engine --meta rope_length_m=1050
+
+The GUI (File -> Import measured tension) and `main.py --measured` read these files
+like the full logs.
 """
 
 import argparse
@@ -35,7 +40,15 @@ def main() -> None:
     )
     ap.add_argument("logs", nargs="+", type=Path, help="log files or directories")
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument(
+        "--meta",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="extra '# key: value' line in every file (repeatable)",
+    )
     a = ap.parse_args()
+    extra = dict(kv.split("=", 1) for kv in a.meta)
     files = []
     for p in a.logs:
         files += sorted(p.glob("*.[cC][sS][vV]")) if p.is_dir() else [p]
@@ -62,6 +75,7 @@ def main() -> None:
                     f"# extracted by: scripts/extract_launches.py\n"
                     f"# {OFFSET_KEY}: {m.offset:.2f}\n"
                 )
+                fh.writelines(f"# {k}: {v}\n" for k, v in extra.items())
                 w = csv.writer(fh, lineterminator="\n")
                 w.writerow(header)
                 w.writerows(keep)

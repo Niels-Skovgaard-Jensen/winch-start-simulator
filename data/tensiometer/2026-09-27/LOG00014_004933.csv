@@ -1,6 +1,11 @@
 # source: ../tensiometer/logs/2026-09-27/RXLOGS/LOG00014.CSV
 # extracted by: scripts/extract_launches.py
 # unloaded_level_n: 80.49
+# rope: dyneema
+# winch: engine
+# rope_length_m: 1050
+# headwind_m_s: 6
+# glider: Discus CS
 time_utc,raw_counts,force_n
 2000-01-01T00:48:35.475,20411,93.21
 2000-01-01T00:49:33.338,307167,1402.70

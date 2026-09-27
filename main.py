@@ -8,8 +8,8 @@ Examples:
     uv run main.py --rope steel --rope-param mu=0.09 --rope-param EA=1.2e6
     uv run main.py --gliders "ASK 13" --only rope    # sensitivity table: rope only
     uv run main.py --no-sensitivity                  # skip the sensitivities
-    uv run main.py --gliders "Discus CS" "ASK 13" --rope steel --rope-length 1000 \
-        --winch engine --measured data/tensiometer/2026-09-27/*.csv
+    uv run main.py --gliders "Discus CS" "ASK 13" --rope-length 1050 --winch engine \
+        --wind 6 --measured data/tensiometer/2026-09-27/*.csv
 """
 
 import argparse
@@ -107,7 +107,8 @@ def main() -> None:
         type=Path,
         default=[],
         metavar="CSV",
-        help="tensiometer logs: draw the measured tension over the hook tension",
+        help="tensiometer logs: draw the measured tension over the hook tension "
+        "(in the detail plots only launches recorded with that glider, or with none)",
     )
     ap.add_argument(
         "--align",
@@ -180,7 +181,7 @@ def main() -> None:
         for m in measured:
             start = "" if m.start_recorded else "  (start of the pull not recorded)"
             print(
-                f"  {m.name}: peak {m.peak / 1e3:.2f} kN, "
+                f"  {m.label}: peak {m.peak / 1e3:.2f} kN, "
                 f"{m.duration:.1f} s from the pull to release{start}"
             )
     first = next(iter(runs.values()))
@@ -195,7 +196,10 @@ def main() -> None:
         plots.launch_detail(
             f"{name} — {rope_name} rope, {a.winch} winch",
             s,
-            measured=traces(measured, a.align, s),
+            # launches recorded with another glider are left out
+            measured=traces(
+                [m for m in measured if m.glider in ("", name)], a.align, s
+            ),
         ).savefig(fn, dpi=130)
     print(f"\nplots written to {a.out}/")
 

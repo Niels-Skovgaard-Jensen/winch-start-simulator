@@ -82,22 +82,26 @@ log: stretches that peak more than 2 kN above the unloaded level. It subtracts t
 sensor offset and detects the start of the pull and the release. Measured and
 simulated launches are lined up at release or at the start of the pull, with the
 same rule for both. Release is the moment the tension drops below 25 % of its peak.
-Five launches from 2026-09-27 (a Discus CS or an ASK 13 on 1000 m of wire) are in
-[`data/tensiometer/`](data/tensiometer/README.md).
+Five launches from 2026-09-27 (Discus CS and ASK 13, 1050 m of Dyneema, engine
+winch, 6 m/s headwind) are in [`data/tensiometer/`](data/tensiometer/README.md). The
+files record these launch conditions, and *Use launch conditions* in the desktop
+app sets up a matching simulation.
 
 ```sh
-uv run main.py --gliders "Discus CS" "ASK 13" --rope steel --rope-length 1000 \
-    --winch engine --measured data/tensiometer/2026-09-27/*.csv
+uv run main.py --gliders "Discus CS" "ASK 13" --rope-length 1050 --winch engine \
+    --wind 6 --measured data/tensiometer/2026-09-27/*.csv
 ```
 
 ![Measured launches over simulated ones](docs/images/compare_measured.png)
 
 *Thin lines: the five measured launches, lined up at release with the Discus CS.
 As with the power-limited engine winch, the measured tension builds up during the
-climb while the reel speed falls. The tension-controlled winch preset keeps it flat
-instead. The measured peaks are 3.8 to 5.7 kN, against 4.6 kN simulated for the
-Discus CS and 6.3 kN for the ASK 13. The measured launches take longer from the
-pull to release: 43 to 52 s, against about 36 s simulated.*
+climb while the reel speed falls. With the default winch setting (pull 1.1 ×
+weight at 15 m/s) the simulation pulls harder than the winch did that day: 5.0 kN
+at the top for the Discus CS (3.8 to 4.3 kN measured) and 6.6 kN for the ASK 13
+(5.0 to 5.7 kN measured). The simulated start is also much harsher. The default
+0.2 % slack and 3 s throttle ramp snatch the glider, while the measured tension
+builds up over about 7 s.*
 
 ## Desktop app
 
@@ -125,7 +129,9 @@ A Qt (PySide6) window with:
     Ctrl+I; a log with several launches gives one row each), with the detected
     start of the pull and release. Ticked launches are drawn over the hook tension
     in *Comparison* and *Detail*. Choose whether to line them up at release or at
-    the start of the pull, and shift single traces in time.
+    the start of the pull, and shift single traces in time. *Use launch
+    conditions* sets glider, rope, winch, rope length and wind as recorded in the
+    file.
   * *Comparison* and *Detail*: the plots, with zoom/pan.
   * *Rope & glider*: rope shape and glider position with a time slider and playback.
   * *Sensitivity*: sortable, filterable table, exportable as CSV.

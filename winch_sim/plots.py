@@ -205,7 +205,7 @@ def measured_launches(launches, mode: str = "release", zero: bool = True) -> Fig
     for k, m in enumerate(launches):
         c = SERIES[k % len(SERIES)]
         t, T = line_up(m, mode), m.tension(zero) / 1e3
-        label = m.name if m.start_recorded else f"{m.name} (start not recorded)"
+        label = m.label if m.start_recorded else f"{m.label}, start not recorded"
         ax.plot(*gapped(t, T), color=c, lw=1.0, label=label)
         for tk, mk in ((m.t_pull, "o"), (m.t_release, "v")):
             i = int(np.searchsorted(m.t, tk))

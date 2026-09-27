@@ -125,6 +125,7 @@ def test_import_measured_tension(window, tmp_path):
     data = Path(__file__).parent.parent / "data" / "tensiometer" / "2026-09-27"
     flat = tmp_path / "flat.csv"
     flat.write_text("t,force_n\n" + "".join(f"{x},80\n" for x in range(100)))
+    defaults = window.settings_dict()
     n, errors = window.import_measurements([*sorted(data.glob("*.csv")), flat])
     assert n == 5 and len(errors) == 1 and "no launch" in errors[0]
     assert window.meas_table.rowCount() == 5
@@ -152,5 +153,19 @@ def test_import_measured_tension(window, tmp_path):
     # importing the same file again gives unique names
     window.import_measurements([min(data.glob("*.csv"))])
     assert len({m.name for m in window.measurements}) == 6
+    # settings from the recorded launch conditions
+    ask13 = next(m for m in window.measurements if m.glider == "ASK 13")
+    window.apply_conditions(ask13)
+    L = window.current_launch()
+    assert window.glider_combo.currentText() == "ASK 13"
+    assert window.rope_combo.currentText() == "dyneema"
+    assert window.winch_combo.currentText() == "engine"
+    assert float(L.rope_length) == 1050.0 and float(L.env.wind_ref) == 6.0
+    assert float(L.glider.mass) == 460.0 and float(L.winch.M_eff) == 250.0
     window._clear_measured()
     assert window.meas_table.rowCount() == 0 and window.meas_pane.canvas is None
+    window.apply_settings_dict(defaults)
+    window.glider_combo.setCurrentText("ASK 21")
+    window.rope_combo.setCurrentText("dyneema")
+    window.winch_combo.setCurrentText("tension")
+    window.set_launch(default_launch())

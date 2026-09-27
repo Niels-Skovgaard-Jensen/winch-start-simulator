@@ -119,6 +119,19 @@ def test_example_launches():
         assert m.tension()[i] < 0.25 * m.peak
     complete = [m.duration for m in ms if m.start_recorded]
     assert all(40.0 < d < 55.0 for d in complete)
+    # launch conditions from the `# key: value` lines
+    assert [m.glider for m in ms] == ["Discus CS", "Discus CS", "ASK 13"] + [
+        "Discus CS",
+        "ASK 13",
+    ]
+    assert ms[0].conditions() == {
+        "glider": "Discus CS",
+        "rope": "dyneema",
+        "winch": "engine",
+        "rope_length_m": 1050.0,
+        "headwind_m_s": 6.0,
+    }
+    assert ms[0].label == "LOG00011_011410 (Discus CS)"
 
 
 def test_line_up_with_a_simulated_launch():
@@ -138,7 +151,7 @@ def test_line_up_with_a_simulated_launch():
     with pytest.raises(ValueError):
         line_up(m, "sideways")
     (name, (_, TT)), *_ = traces([m], "release", s, zero=False).items()
-    assert name == m.name and TT[0] == pytest.approx(m.force[0])
+    assert name == m.label and TT[0] == pytest.approx(m.force[0])
 
 
 def test_measured_figures():

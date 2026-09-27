@@ -40,6 +40,7 @@ MEASURED_DIR = Path("data/tensiometer")  # example logs, see data/tensiometer/RE
 MEASURED_HEADS = (
     "show",
     "measurement",
+    "glider",
     "clock",
     "pull → release s",
     "peak kN",
@@ -629,6 +630,7 @@ class MainWindow(QtWidgets.QMainWindow):
         tl.addWidget(t, 1)
         btns = QtWidgets.QHBoxLayout()
         for text, slot in [
+            ("Use launch conditions", self._use_conditions),
             ("Remove selected", self._remove_measured),
             ("Clear all", self._clear_measured),
         ]:
@@ -639,7 +641,9 @@ class MainWindow(QtWidgets.QMainWindow):
             "Rope tension logged by the tensiometer at the glider end of the rope. "
             "Ticked launches are drawn over the simulated tension at the hook in "
             "the Comparison and Detail tabs. A log with several launches gives one "
-            "row each. Double-click 'shift s' to move a trace in time."
+            "row each. Double-click 'shift s' to move a trace in time. 'Use launch "
+            "conditions' sets glider, rope, winch, rope length and wind as recorded "
+            "with the selected launch."
         )
         note.setWordWrap(True)
         note.setStyleSheet("color: gray;")
@@ -1102,6 +1106,7 @@ class MainWindow(QtWidgets.QMainWindow):
         items = [
             chk,
             QtWidgets.QTableWidgetItem(m.name),
+            QtWidgets.QTableWidgetItem(m.glider),
             QtWidgets.QTableWidgetItem(m.clock),
             QtWidgets.QTableWidgetItem(duration),
             num_item(m.peak / 1e3, ".2f"),
@@ -1109,7 +1114,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QTableWidgetItem(f"{m.shift:g}"),
             QtWidgets.QTableWidgetItem(Path(m.source).name),
         ]
-        items[2].setToolTip("logger clock at the start of the pull (time since boot)")
+        items[3].setToolTip("logger clock at the start of the pull (time since boot)")
         items[-1].setToolTip(m.source)
         for j, it in enumerate(items):
             if j != SHIFT_COL:
@@ -1166,6 +1171,42 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._refresh_compare()
         self._show_detail(self.detail_combo.currentIndex())
+
+    def _use_conditions(self):
+        """Settings from the launch conditions recorded with the selected launch."""
+        rows = sorted({ix.row() for ix in self.meas_table.selectedIndexes()})
+        if not rows:
+            self.statusBar().showMessage("select a measured launch first")
+            return
+        m = self.measurements[rows[0]]
+        self.apply_conditions(m)
+
+    def apply_conditions(self, m: Measurement):
+        c = m.conditions()
+        done = []
+        if c.get("glider") in CATALOGUE:  # also re-applies the winch preset
+            self.glider_combo.setCurrentText(str(c["glider"]))
+            self._apply_glider(str(c["glider"]))
+            done.append(str(c["glider"]))
+        if c.get("rope") in ROPES:
+            self.rope_combo.setCurrentText(str(c["rope"]))
+            self._apply_rope(str(c["rope"]))
+            done.append(f"{c['rope']} rope")
+        if "rope_length_m" in c:
+            self.launch_form.set_si({"rope_length": c["rope_length_m"]})
+            done.append(f"{c['rope_length_m']:g} m")
+        if c.get("winch") in WINCH_PRESETS:
+            self.winch_combo.setCurrentText(str(c["winch"]))
+            self._apply_winch()
+            done.append(f"{c['winch']} winch")
+        if "headwind_m_s" in c:
+            self.env_form.set_si({"wind_ref": c["headwind_m_s"]})
+            done.append(f"headwind {c['headwind_m_s']:g} m/s")
+        self.statusBar().showMessage(
+            f"settings from {m.name}: {', '.join(done)}"
+            if done
+            else f"no launch conditions recorded in {Path(m.source).name}"
+        )
 
     def _remove_measured(self):
         rows = {ix.row() for ix in self.meas_table.selectedIndexes()}
