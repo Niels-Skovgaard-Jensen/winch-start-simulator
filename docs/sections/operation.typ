@@ -98,7 +98,7 @@ values are in @o-tab-pilot.
     [`back_release_angle`], [110°], [back-release of the hook (@sec-events)],
   ),
   caption: [Pilot parameters (`gliders.make_pilot`). Per glider: Ka 8 35°,
-    85 km/h; ASK 13 35°, 100 km/h; LS4 and ASK 21 40°, 105 km/h; ASG 29 and
+    85 km/h; ASK 13 35°, 100 km/h; LS4, Discus CS and ASK 21 40°, 105 km/h; ASG 29 and
     DG-1000 40°, 115 km/h.],
 ) <o-tab-pilot>
 

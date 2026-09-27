@@ -179,6 +179,23 @@ CATALOGUE: dict[str, tuple[Glider, Pilot]] = {
         ),
         make_pilot(V_target_kmh=105.0),
     ),
+    # Standard-class 15 m single seater (Czech-built Discus b), dry.  Span, area,
+    # L/D ~42 and max winch speed 150 km/h as for the Discus b; empty mass ~240 kg
+    # + pilot and parachute.  Estimated: CLmax, weak link (600 daN), inertia, hook
+    # and wheel geometry.
+    "Discus CS": (
+        make_glider(
+            mass=330.0,
+            span=15.0,
+            area=10.58,
+            LD_max=42.0,
+            CLmax=1.4,
+            V_W_kmh=150.0,
+            weak_link_daN=600.0,
+            radius_of_gyration=1.15,
+        ),
+        make_pilot(V_target_kmh=105.0),
+    ),
     # Two-seat trainer
     "ASK 21": (
         make_glider(

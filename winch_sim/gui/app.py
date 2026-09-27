@@ -20,6 +20,7 @@ import winch_sim  # noqa: F401  (float64)
 from .. import plots
 from ..cable import ROPES, load_rope
 from ..gliders import CATALOGUE
+from ..measured import ALIGN_MODES, Measurement, load_launches, traces
 from ..params import Env, Glider, Launch, Pilot, Rope, Winch
 from ..report import COLUMNS, write_sensitivity_csv
 from ..sensitivity import sensitivity_unit
@@ -35,6 +36,18 @@ from .worker import (  # noqa: F401  (run_launch re-exported for scripts/tests)
 )
 
 WINCH_PRESETS = ("tension", "engine")
+MEASURED_DIR = Path("data/tensiometer")  # example logs, see data/tensiometer/README.md
+MEASURED_HEADS = (
+    "show",
+    "measurement",
+    "clock",
+    "pull → release s",
+    "peak kN",
+    "offset N",
+    "shift s",
+    "file",
+)
+SHIFT_COL = MEASURED_HEADS.index("shift s")
 
 
 class FigurePane(QtWidgets.QWidget):
@@ -373,6 +386,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Winch launch simulator")
         self.resize(1560, 980)
         self.runs: list[RunResult] = []
+        self.measurements: list[Measurement] = []
         self._run_counter = 0
         # Simulations run in a worker process, so a running one can be stopped.
         # It starts now, so JAX is imported while the user edits settings.
@@ -526,6 +540,8 @@ class MainWindow(QtWidgets.QMainWindow):
         btns.addStretch(1)
         rl.addLayout(btns)
         self.results.addTab(runs, "Runs")
+        self.measured_tab = self._measured_tab()
+        self.results.addTab(self.measured_tab, "Measured")
 
         compare = QtWidgets.QWidget()
         cl = QtWidgets.QVBoxLayout(compare)
@@ -578,6 +594,69 @@ class MainWindow(QtWidgets.QMainWindow):
         self.results.addTab(sens, "Sensitivity")
         return self.results
 
+    def _measured_tab(self) -> QtWidgets.QWidget:
+        top = QtWidgets.QWidget()
+        tl = QtWidgets.QVBoxLayout(top)
+        tl.setContentsMargins(0, 0, 0, 0)
+        ctl = QtWidgets.QHBoxLayout()
+        imp = QtWidgets.QPushButton("Import tensiometer CSV…")
+        imp.clicked.connect(self._import_measured)
+        self.align_combo = QtWidgets.QComboBox()
+        for key, text in ALIGN_MODES.items():
+            self.align_combo.addItem(text, key)
+        self.align_combo.setToolTip(
+            "where measured traces go on the time axis: their release (or start of "
+            "the pull) at the same moment as in the run they are drawn with"
+        )
+        self.align_combo.currentIndexChanged.connect(self._measured_changed)
+        self.zero_check = QtWidgets.QCheckBox("subtract the sensor offset")
+        self.zero_check.setToolTip(
+            "subtract the unloaded level (the logger reads ~70-90 N without load)"
+        )
+        self.zero_check.setChecked(True)
+        self.zero_check.toggled.connect(self._measured_changed)
+        ctl.addWidget(imp)
+        ctl.addWidget(QtWidgets.QLabel("line up"))
+        ctl.addWidget(self.align_combo)
+        ctl.addWidget(self.zero_check)
+        ctl.addStretch(1)
+        tl.addLayout(ctl)
+        t = self.meas_table = QtWidgets.QTableWidget(0, len(MEASURED_HEADS))
+        t.setHorizontalHeaderLabels(list(MEASURED_HEADS))
+        t.verticalHeader().setVisible(False)
+        t.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        t.itemChanged.connect(self._measured_item_changed)
+        tl.addWidget(t, 1)
+        btns = QtWidgets.QHBoxLayout()
+        for text, slot in [
+            ("Remove selected", self._remove_measured),
+            ("Clear all", self._clear_measured),
+        ]:
+            b = QtWidgets.QPushButton(text)
+            b.clicked.connect(slot)
+            btns.addWidget(b)
+        note = QtWidgets.QLabel(
+            "Rope tension logged by the tensiometer at the glider end of the rope. "
+            "Ticked launches are drawn over the simulated tension at the hook in "
+            "the Comparison and Detail tabs. A log with several launches gives one "
+            "row each. Double-click 'shift s' to move a trace in time."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color: gray;")
+        btns.addWidget(note, 1)
+        tl.addLayout(btns)
+
+        self.meas_pane = FigurePane()
+        self.meas_pane.placeholder.setText(
+            "Import a tensiometer log (File → Import measured tension) to see it here."
+        )
+        split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+        split.addWidget(top)
+        split.addWidget(self.meas_pane)
+        split.setStretchFactor(1, 1)
+        split.setSizes([230, 650])
+        return split
+
     def _menus(self):
         m = self.menuBar().addMenu("&File")
         for text, slot, key in [
@@ -592,6 +671,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 QtGui.QKeySequence.StandardKey.Open,
             ),
             ("Load rope (TOML)…", self._load_rope, None),
+            ("Import measured tension (CSV)…", self._import_measured, "Ctrl+I"),
             ("Quit", self.close, QtGui.QKeySequence.StandardKey.Quit),
         ]:
             act = m.addAction(text)
@@ -883,10 +963,20 @@ class MainWindow(QtWidgets.QMainWindow):
             for i, r in enumerate(self.runs)
             if self.runs_table.item(i, 0).checkState() == QtCore.Qt.CheckState.Checked
         }
+        ref = next(iter(chosen.values()), None)
+        measured = self._measured_traces(ref)
         self.compare_pane.set_figure(
-            plots.compare(chosen, "Comparison of checked runs") if chosen else None
+            plots.compare(chosen, "Comparison of checked runs", measured)
+            if chosen or measured
+            else None
         )
-        self.compare_info.setText(f"{len(chosen)} of {len(self.runs)} runs compared")
+        info = f"{len(chosen)} of {len(self.runs)} runs compared"
+        if measured:
+            info += (
+                f"; {len(measured)} measured, lined up {self.align_combo.currentText()}"
+            )
+            info += f" with {next(iter(chosen))}" if chosen else " at t = 0"
+        self.compare_info.setText(info)
         self.compare_pane.placeholder.setText(
             "No runs selected: tick runs in the Runs tab or press 'Compare all runs'."
             if self.runs
@@ -905,7 +995,11 @@ class MainWindow(QtWidgets.QMainWindow):
     def _show_detail(self, i: int):
         run = self._run_at(i)
         self.detail_pane.set_figure(
-            plots.launch_detail(run.name, run.series) if run else None
+            plots.launch_detail(
+                run.name, run.series, measured=self._measured_traces(run.series)
+            )
+            if run
+            else None
         )
 
     def _load_run_settings(self):
@@ -951,6 +1045,140 @@ class MainWindow(QtWidgets.QMainWindow):
         for combo in (self.detail_combo, self.rope_combo_run, self.sens_combo):
             combo.clear()
         self._refresh_compare()
+
+    # ---- measured tension ----------------------------------------------------------
+
+    def _import_measured(self):
+        start = str(MEASURED_DIR) if MEASURED_DIR.is_dir() else ""
+        fns, _ = QtWidgets.QFileDialog.getOpenFileNames(
+            self, "Import measured tension", start, "CSV (*.csv *.CSV);;All files (*)"
+        )
+        if not fns:
+            return
+        n, errors = self.import_measurements(fns)
+        self.statusBar().showMessage(
+            f"{n} measured launch{'es' if n != 1 else ''} imported from "
+            f"{len(fns)} file{'s' if len(fns) != 1 else ''}"
+        )
+        if n:
+            self.results.setCurrentWidget(self.measured_tab)
+        if errors:
+            QtWidgets.QMessageBox.warning(
+                self, "Import measured tension", "\n".join(errors)
+            )
+
+    def import_measurements(self, paths) -> tuple[int, list[str]]:
+        """Add every launch found in the files; (number added, error messages)."""
+        n, errors = 0, []
+        for p in paths:
+            try:
+                found = load_launches(p)
+            except (OSError, ValueError) as e:
+                errors.append(str(e))
+                continue
+            for m in found:
+                self.add_measurement(m)
+                n += 1
+        return n, errors
+
+    def add_measurement(self, m: Measurement):
+        names = {x.name for x in self.measurements}
+        base, k = m.name, 2
+        while m.name in names:
+            m.name, k = f"{base} ({k})", k + 1
+        self.measurements.append(m)
+        t = self.meas_table
+        t.blockSignals(True)
+        i = t.rowCount()
+        t.insertRow(i)
+        chk = QtWidgets.QTableWidgetItem()
+        chk.setFlags(chk.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+        chk.setCheckState(QtCore.Qt.CheckState.Checked)
+        duration = (
+            f"{m.duration:.1f}"
+            if m.start_recorded
+            else f"> {m.duration:.0f} (start not recorded)"
+        )
+        items = [
+            chk,
+            QtWidgets.QTableWidgetItem(m.name),
+            QtWidgets.QTableWidgetItem(m.clock),
+            QtWidgets.QTableWidgetItem(duration),
+            num_item(m.peak / 1e3, ".2f"),
+            num_item(m.offset, ".0f"),
+            QtWidgets.QTableWidgetItem(f"{m.shift:g}"),
+            QtWidgets.QTableWidgetItem(Path(m.source).name),
+        ]
+        items[2].setToolTip("logger clock at the start of the pull (time since boot)")
+        items[-1].setToolTip(m.source)
+        for j, it in enumerate(items):
+            if j != SHIFT_COL:
+                it.setFlags(it.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+            t.setItem(i, j, it)
+        t.blockSignals(False)
+        t.resizeColumnsToContents()
+        self._measured_changed()
+
+    def _checked_measurements(self) -> list[Measurement]:
+        t = self.meas_table
+        return [
+            m
+            for i, m in enumerate(self.measurements)
+            if t.item(i, 0).checkState() == QtCore.Qt.CheckState.Checked
+        ]
+
+    def _measured_traces(self, ref) -> dict:
+        """Ticked measurements lined up with the simulated series `ref` (or t = 0)."""
+        return traces(
+            self._checked_measurements(),
+            self.align_combo.currentData(),
+            ref,
+            self.zero_check.isChecked(),
+        )
+
+    def _measured_item_changed(self, item):
+        if item.column() == SHIFT_COL:
+            m = self.measurements[item.row()]
+            try:
+                m.shift = float(item.text())
+            except ValueError:
+                pass  # keep the old shift
+            self.meas_table.blockSignals(True)
+            item.setText(f"{m.shift:g}")
+            self.meas_table.blockSignals(False)
+        if item.column() in (0, SHIFT_COL):
+            self._measured_changed()
+
+    def _measured_changed(self, *_):
+        chosen = self._checked_measurements()
+        self.meas_pane.set_figure(
+            plots.measured_launches(
+                chosen, self.align_combo.currentData(), self.zero_check.isChecked()
+            )
+            if chosen
+            else None
+        )
+        self.meas_pane.placeholder.setText(
+            "Tick a measured launch to show it."
+            if self.measurements
+            else "Import a tensiometer log (File → Import measured tension) to see "
+            "it here."
+        )
+        self._refresh_compare()
+        self._show_detail(self.detail_combo.currentIndex())
+
+    def _remove_measured(self):
+        rows = {ix.row() for ix in self.meas_table.selectedIndexes()}
+        for i in sorted(rows, reverse=True):
+            del self.measurements[i]
+            self.meas_table.removeRow(i)
+        if rows:
+            self._measured_changed()
+
+    def _clear_measured(self):
+        self.measurements.clear()
+        self.meas_table.setRowCount(0)
+        self._measured_changed()
 
 
 def main() -> None:

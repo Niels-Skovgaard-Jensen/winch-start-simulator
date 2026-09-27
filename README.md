@@ -16,7 +16,10 @@ Simulator for glider winch launches, written in JAX and solved with
   elongation or EA) or TOML files
 * ISA air density vs height (airfield elevation, ISA temperature offset);
   indicated vs true airspeed
-* catalogue of gliders: Ka 8, ASK 13, LS4, ASK 21, ASG 29, DG-1000 (approximate data)
+* catalogue of gliders: Ka 8, ASK 13, LS4, Discus CS, ASK 21, ASG 29, DG-1000
+  (approximate data)
+* measured rope tension from tensiometer logs (CSV), drawn over the simulated
+  tension at the hook
 
 The physics and the numerical approach are written up in Typst in
 [`docs/physics.typ`](docs/physics.typ) (bibliography in `docs/refs.yml`). Build the
@@ -70,6 +73,32 @@ technique and the rope's drag. Rope stretch (EA) hardly matters for height. The
 full table is written to `results/sensitivity_<glider>_<rope>_<winch>.csv`, and
 `--only rope` filters it.
 
+## Measured launches
+
+Rope tension measured on real launches can be drawn over the simulated tension at
+the hook. The club's tensiometer, a load cell in line with the rope at the glider
+end, logs CSV files. `winch_sim/measured.py` reads them and finds the launches in a
+log: stretches that peak more than 2 kN above the unloaded level. It subtracts the
+sensor offset and detects the start of the pull and the release. Measured and
+simulated launches are lined up at release or at the start of the pull, with the
+same rule for both. Release is the moment the tension drops below 25 % of its peak.
+Five launches from 2026-09-27 (a Discus CS or an ASK 13 on 1000 m of wire) are in
+[`data/tensiometer/`](data/tensiometer/README.md).
+
+```sh
+uv run main.py --gliders "Discus CS" "ASK 13" --rope steel --rope-length 1000 \
+    --winch engine --measured data/tensiometer/2026-09-27/*.csv
+```
+
+![Measured launches over simulated ones](docs/images/compare_measured.png)
+
+*Thin lines: the five measured launches, lined up at release with the Discus CS.
+As with the power-limited engine winch, the measured tension builds up during the
+climb while the reel speed falls. The tension-controlled winch preset keeps it flat
+instead. The measured peaks are 3.8 to 5.7 kN, against 4.6 kN simulated for the
+Discus CS and 6.3 kN for the ASK 13. The measured launches take longer from the
+pull to release: 43 to 52 s, against about 36 s simulated.*
+
 ## Desktop app
 
 ```sh
@@ -92,6 +121,11 @@ A Qt (PySide6) window with:
 * **results:**
   * *Runs*: summary table of all runs; tick runs to compare them, reload a run's
     settings, export a time series as CSV.
+  * *Measured*: imported tensiometer launches (File → Import measured tension,
+    Ctrl+I; a log with several launches gives one row each), with the detected
+    start of the pull and release. Ticked launches are drawn over the hook tension
+    in *Comparison* and *Detail*. Choose whether to line them up at release or at
+    the start of the pull, and shift single traces in time.
   * *Comparison* and *Detail*: the plots, with zoom/pan.
   * *Rope & glider*: rope shape and glider position with a time slider and playback.
   * *Sensitivity*: sortable, filterable table, exportable as CSV.
@@ -113,6 +147,8 @@ uv run main.py --rope steel --rope-param mu=0.09 --rope-param EA=1.2e6
 uv run main.py --gliders "ASK 13" --only rope   # sensitivity table: rope parameters only
 uv run main.py --field-elevation 1500 --isa-dt 15 # hot, high airfield (ISA atmosphere)
 uv run main.py --rope-length 10000 --segments-per-km 10 --t-max 20000
+uv run main.py --gliders "ASK 13" --measured data/tensiometer/2026-09-27/*.csv
+uv run main.py --measured my_log.CSV --align pull  # line up at the start of the pull
 uv run pytest
 ```
 
@@ -164,4 +200,7 @@ series = time_series(launch, sol)  # numpy arrays for plotting
 | `ropes/*.toml` | example rope definitions |
 | `winch_sim/plots.py` | figures |
 | `winch_sim/report.py` | summary columns, sensitivity CSV (shared by CLI and GUI) |
+| `winch_sim/measured.py` | measured tension: read tensiometer logs, find launches, line up with simulations |
 | `winch_sim/gui/` | Qt desktop app (`app.py`), auto-generated settings forms (`forms.py`) |
+| `data/tensiometer/` | measured example launches (see its README) |
+| `scripts/extract_launches.py` | cut the launches out of tensiometer logs, one CSV each |

@@ -5,6 +5,7 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 QtWidgets = pytest.importorskip("PySide6.QtWidgets")
+QtCore = pytest.importorskip("PySide6.QtCore")
 
 from winch_sim.gui.app import (
     MainWindow,
@@ -114,3 +115,42 @@ def test_stop_kills_the_running_simulation(window):
     assert window._sim._proc.is_alive()  # a fresh worker is ready
     assert window.run_btn.isEnabled() and not window.stop_btn.isEnabled()
     assert "stopped" in window.statusBar().currentMessage()
+
+
+def test_import_measured_tension(window, tmp_path):
+    from pathlib import Path
+
+    from winch_sim.gui.app import SHIFT_COL
+
+    data = Path(__file__).parent.parent / "data" / "tensiometer" / "2026-09-27"
+    flat = tmp_path / "flat.csv"
+    flat.write_text("t,force_n\n" + "".join(f"{x},80\n" for x in range(100)))
+    n, errors = window.import_measurements([*sorted(data.glob("*.csv")), flat])
+    assert n == 5 and len(errors) == 1 and "no launch" in errors[0]
+    assert window.meas_table.rowCount() == 5
+    assert window.meas_pane.canvas is not None
+    if not window.runs:
+        window.add_run(
+            run_launch("m", window.current_launch(), Numerics(sensitivity=False))
+        )
+    window._set_all_compared(True)
+    ax_T = window.compare_pane.canvas.figure.axes[3]
+    labels = [ln.get_label() for ln in ax_T.get_lines()]
+    assert sum(lb.startswith("measured:") for lb in labels) == 5
+    assert "5 measured" in window.compare_info.text()
+    # the shift column is editable; invalid text keeps the old value
+    item = window.meas_table.item(0, SHIFT_COL)
+    item.setText("2.5")
+    assert window.measurements[0].shift == 2.5
+    item.setText("abc")
+    assert window.measurements[0].shift == 2.5 and item.text() == "2.5"
+    # unticked measurements are not drawn
+    window.meas_table.item(0, 0).setCheckState(QtCore.Qt.CheckState.Unchecked)
+    ax_T = window.compare_pane.canvas.figure.axes[3]
+    labels = [ln.get_label() for ln in ax_T.get_lines()]
+    assert sum(lb.startswith("measured:") for lb in labels) == 4
+    # importing the same file again gives unique names
+    window.import_measurements([min(data.glob("*.csv"))])
+    assert len({m.name for m in window.measurements}) == 6
+    window._clear_measured()
+    assert window.meas_table.rowCount() == 0 and window.meas_pane.canvas is None

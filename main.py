@@ -8,6 +8,8 @@ Examples:
     uv run main.py --rope steel --rope-param mu=0.09 --rope-param EA=1.2e6
     uv run main.py --gliders "ASK 13" --only rope    # sensitivity table: rope only
     uv run main.py --no-sensitivity                  # skip the sensitivities
+    uv run main.py --gliders "Discus CS" "ASK 13" --rope steel --rope-length 1000 \
+        --winch engine --measured data/tensiometer/2026-09-27/*.csv
 """
 
 import argparse
@@ -17,6 +19,7 @@ import winch_sim  # noqa: F401  (enables float64)
 from winch_sim import plots
 from winch_sim.cable import ROPES, load_rope, override_rope
 from winch_sim.gliders import CATALOGUE
+from winch_sim.measured import ALIGN_MODES, load_launches, traces
 from winch_sim.params import Env, Launch
 from winch_sim.report import COLUMNS, write_sensitivity_csv
 from winch_sim.sensitivity import (
@@ -98,8 +101,24 @@ def main() -> None:
         metavar="PREFIX",
         help="restrict the sensitivity table to e.g. rope, glider, winch.F_max",
     )
+    ap.add_argument(
+        "--measured",
+        nargs="+",
+        type=Path,
+        default=[],
+        metavar="CSV",
+        help="tensiometer logs: draw the measured tension over the hook tension",
+    )
+    ap.add_argument(
+        "--align",
+        choices=list(ALIGN_MODES),
+        default="release",
+        help="line measured traces up with the simulation at release (the drop in "
+        "tension) or at the start of the pull",
+    )
     ap.add_argument("--out", type=Path, default=Path("results"))
     a = ap.parse_args()
+    measured = [m for fn in a.measured for m in load_launches(fn)]
 
     rope = load_rope(a.rope_file) if a.rope_file else ROPES[a.rope]
     rope_name = a.rope_file.stem if a.rope_file else a.rope
@@ -156,15 +175,28 @@ def main() -> None:
         print(f"{name:10s}" + "".join(_cell(summ[k], f, sc) for k, _, f, sc in COLUMNS))
         runs[name] = time_series(L, s_i)
 
+    if measured:
+        print(f"\nmeasured launches (lined up {ALIGN_MODES[a.align]}):")
+        for m in measured:
+            start = "" if m.start_recorded else "  (start of the pull not recorded)"
+            print(
+                f"  {m.name}: peak {m.peak / 1e3:.2f} kN, "
+                f"{m.duration:.1f} s from the pull to release{start}"
+            )
+    first = next(iter(runs.values()))
     fig = plots.compare(
-        runs, f"Winch launch comparison — {rope_name} rope, {a.winch} winch"
+        runs,
+        f"Winch launch comparison — {rope_name} rope, {a.winch} winch",
+        traces(measured, a.align, first),
     )
     fig.savefig(a.out / f"compare_{tag}.png", dpi=130)
     for name, s in runs.items():
         fn = a.out / f"detail_{name.replace(' ', '_')}_{tag}.png"
-        plots.launch_detail(f"{name} — {rope_name} rope, {a.winch} winch", s).savefig(
-            fn, dpi=130
-        )
+        plots.launch_detail(
+            f"{name} — {rope_name} rope, {a.winch} winch",
+            s,
+            measured=traces(measured, a.align, s),
+        ).savefig(fn, dpi=130)
     print(f"\nplots written to {a.out}/")
 
     if a.no_sensitivity:
