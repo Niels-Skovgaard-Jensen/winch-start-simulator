@@ -74,7 +74,7 @@ def default_launch(glider="ASK 21", rope="dyneema") -> Launch:
         pilot=p,
         env=Env(),
         rope_length=1200.0,
-        slack=0.002,
+        slack=0.0,
     )
 
 

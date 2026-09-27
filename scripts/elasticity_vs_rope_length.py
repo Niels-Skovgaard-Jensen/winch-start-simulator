@@ -100,7 +100,7 @@ def make_launch(glider: str, rope: str, winch: str, length: float) -> Launch:
         pilot=p,
         env=Env(),
         rope_length=float(length),
-        slack=0.002,
+        slack=0.0,
     )
 
 

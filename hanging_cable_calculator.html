@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maximum cable height with wind · calculator</title>
+<style>
+  :root { font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #182439; background: #f7f9fc; }
+  * { box-sizing: border-box; }
+  body { max-width: 1050px; margin: 0 auto; padding: 24px 18px 42px; }
+  h1 { font-size: clamp(1.55rem, 3vw, 2.1rem); margin: 0 0 9px; }
+  h2 { font-size: 1.08rem; margin: 22px 0 10px; }
+  p { line-height: 1.5; margin: 7px 0 15px; }
+  .muted { color: #536276; }
+  .inputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
+  label { display: block; font-size: .93rem; font-weight: 650; }
+  input { display: block; width: 100%; padding: 10px 11px; margin-top: 6px; border: 1px solid #9aa9be; border-radius: 6px; font: inherit; font-variant-numeric: tabular-nums; }
+  input:focus-visible { outline: 3px solid #80b4fa; outline-offset: 1px; }
+  .plot { display: block; width: 100%; background: #fff; border: 1px solid #d7dfeb; border-radius: 7px; }
+  .error { color: #a32720; font-weight: 700; min-height: 1.4em; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 9px 0; }
+  button { padding: 10px 14px; border: 1px solid #0969da; border-radius: 6px; background: #0969da; color: #fff; font: inherit; font-weight: 650; cursor: pointer; }
+  button:hover:not(:disabled) { background: #0758b5; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .outputs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .metric { background: #fff; border: 1px solid #d7dfeb; border-radius: 7px; padding: 12px; }
+  .metric span { display: block; color: #536276; font-size: .83rem; }
+  .metric strong { display: block; font-size: 1.22rem; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .formula { padding: 10px 14px; border-left: 3px solid #0969da; background: #edf4fd; overflow-x: auto; line-height: 1.7; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px 8px 0; border-bottom: 1px solid #d7dfeb; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  @media (max-width: 680px) { .inputs { grid-template-columns: 1fr; } .outputs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<h1>Maximum cable height with wind</h1>
+<p class="muted">Find the greatest height allowed by the cable length and the upper tension limit. The lift-off angle is calculated; excess cable can rest on the ground. Wind blows from the winch toward the aircraft (+x).</p>
+<div class="inputs">
+  <label for="length">Cable length L (m)<input id="length" type="text" inputmode="decimal" value="6000"></label>
+  <label for="mass">Cable mass μ (kg/m)<input id="mass" type="text" inputmode="decimal" value="0.1"></label>
+  <label for="topTension">Maximum upper tension (N)<input id="topTension" type="text" inputmode="decimal" value="10000"></label>
+  <label for="diameter">Cable diameter (mm)<input id="diameter" type="text" inputmode="decimal" value="8"></label>
+  <label for="wind">Wind speed at upper end (m/s)<input id="wind" type="text" inputmode="decimal" value="10"></label>
+  <label for="startAltitude">Start altitude above sea level (m)<input id="startAltitude" type="text" inputmode="decimal" value="0"></label>
+  <label for="airspeed">Indicated airspeed (IAS, km/h)<input id="airspeed" type="text" inputmode="decimal" value="90"></label>
+  <label for="climbAngle">Glider climb angle through air (°)<input id="climbAngle" type="text" inputmode="decimal" value="10"></label>
+</div>
+<p class="muted" style="font-size:.87rem">Use either a dot or a comma for decimals (for example, 0.1 or 0,1). Do not use thousands separators.</p>
+<p class="muted" style="font-size:.87rem">Enter the speed shown on the glider's airspeed indicator. The calculator estimates true airspeed (TAS) from standard-atmosphere density at the glider's calculated altitude. The glider flies through the air toward the winch and upward at the entered angle. Wind can carry it away from the winch over the ground even while it climbs. Set IAS to 0 for the stationary-cable model. <a href="https://www.faa.gov/newsroom/fly-safe-prevent-loss-control-accidents-28">FAA airspeed explanation</a>.</p>
+<p id="error" class="error" role="alert"></p>
+<section aria-label="Export current calculation">
+  <h2>Output</h2>
+  <div class="actions">
+    <button id="downloadReport" type="button">Download report (HTML)</button>
+    <button id="downloadPath" type="button">Download cable path (SVG)</button>
+    <button id="downloadData" type="button">Download all points (CSV)</button>
+  </div>
+  <p class="muted" style="font-size:.87rem">The report includes the current inputs, results and graphs. Open it in a browser to print or save it as PDF. The CSV contains every calculated point along the cable.</p>
+</section>
+<h2>Cable path</h2>
+<svg id="chart" class="plot" viewBox="0 0 860 500" role="img" aria-label="Cable height against horizontal distance, labeled with glider airspeed through air"></svg>
+<p class="muted" style="font-size:.87rem">Grey dashed: ideal stationary, no-wind maximum at the same tension limit. Blue: maximum under the entered wind and glider speed. A level section is cable resting on the ground. Horizontal and vertical axes use different scales.</p>
+<p class="muted" style="font-size:.87rem">This is a quasi-static height estimate, not a time-dependent launch simulation. A moving cable's velocity is approximated as rising linearly from zero at the winch to the glider's ground velocity. The entered climb angle sets the glider's direction through the air, not its ground track or a fixed endpoint position. Cable acceleration, winch payout, and the glider's own lift and drag are not modeled.</p>
+<div class="outputs" aria-live="polite">
+  <div class="metric"><span>Indicated airspeed (IAS)</span><strong id="airspeedResult">—</strong></div>
+  <div class="metric"><span>True airspeed at glider (TAS)</span><strong id="tasTop">—</strong></div>
+  <div class="metric"><span>Glider ground speed (total)</span><strong id="groundSpeedTotal">—</strong></div>
+  <div class="metric"><span>Total aerodynamic load in x</span><strong id="fxWind">—</strong></div>
+  <div class="metric"><span>x-load per metre at top</span><strong id="qxTop">—</strong></div>
+  <div class="metric"><span>Tension at lift-off</span><strong id="tStart">—</strong></div>
+  <div class="metric"><span>Top horizontal force</span><strong id="pxTop">—</strong></div>
+  <div class="metric"><span>Air density at start</span><strong id="rhoStart">—</strong></div>
+  <div class="metric"><span>Air density at upper end</span><strong id="rhoTop">—</strong></div>
+  <div class="metric"><span>Wind speed at 10 m</span><strong id="wind10">—</strong></div>
+  <div class="metric"><span>Wind speed at upper end</span><strong id="windTop">—</strong></div>
+  <div class="metric"><span>Standard temperature at start</span><strong id="tempStart">—</strong></div>
+  <div class="metric"><span>Standard temperature at upper end</span><strong id="tempTop">—</strong></div>
+  <div class="metric"><span>Drag coefficient at upper end</span><strong id="cdTop">—</strong></div>
+  <div class="metric"><span>Reynolds number at upper end</span><strong id="reTop">—</strong></div>
+  <div class="metric"><span>Upper tension used</span><strong id="tTopUsed">—</strong></div>
+  <div class="metric"><span>Suspended cable length</span><strong id="suspended">—</strong></div>
+  <div class="metric"><span>Cable on ground</span><strong id="onGround">—</strong></div>
+  <div class="metric"><span>Lift-off angle</span><strong id="liftAngle">—</strong></div>
+  <div class="metric"><span>Top horizontal distance</span><strong id="xTop">—</strong></div>
+  <div class="metric"><span>Maximum top height</span><strong id="yTop">—</strong></div>
+  <div class="metric"><span>Top cable angle</span><strong id="angle">—</strong></div>
+  <div class="metric"><span>Horizontal tension at lift-off</span><strong id="horizontal">—</strong></div>
+  <div class="metric"><span>Glider horizontal motion over ground</span><strong id="groundSpeed">—</strong></div>
+  <div class="metric"><span>Glider climb rate</span><strong id="climbRate">—</strong></div>
+  <div class="metric"><span>Relative airflow at cable top</span><strong id="relativeTop">—</strong></div>
+  <div class="metric"><span>True crossflow at cable top</span><strong id="crossflowTop">—</strong></div>
+  <div class="metric"><span>Sea-level-equivalent crossflow at top</span><strong id="crossflowEquivalentTop">—</strong></div>
+</div>
+<p class="muted" style="font-size:.87rem">At the glider, true airflow relative to the cable has magnitude TAS. The crossflow is its component perpendicular to the cable, so it cannot exceed TAS. The sea-level-equivalent crossflow has the same dynamic pressure at 1.225 kg/m³ and can be compared with the entered IAS.</p>
+<h2>Horizontal aerodynamic load along the cable</h2>
+<svg id="loadChart" class="plot" viewBox="0 0 860 290" role="img" aria-label="Horizontal aerodynamic load per metre plotted along the cable"></svg>
+<h2>Airspeed, wind and airflow</h2>
+<svg id="speedChart" class="plot" viewBox="0 0 860 290" role="img" aria-label="Glider airspeed, ambient wind, relative airflow, and crossflow along the cable"></svg>
+<p class="muted" style="font-size:.87rem">IAS is the entered indicated airspeed. TAS is the estimated speed through the air at the glider's altitude; the cable-motion calculation uses TAS. Wind then changes the glider's speed over the ground. The airflow and crossflow curves show true local speeds in m/s.</p>
+<h2>Standard-atmosphere temperature versus altitude</h2>
+<svg id="temperatureChart" class="plot" viewBox="0 0 860 290" role="img" aria-label="Standard-atmosphere temperature along the cable versus altitude"></svg>
+<h2>Drag coefficient versus altitude</h2>
+<svg id="dragChart" class="plot" viewBox="0 0 860 290" role="img" aria-label="Circular cable drag coefficient plotted against altitude above sea level"></svg>
+<h2>Reynolds number versus altitude</h2>
+<svg id="reChart" class="plot" viewBox="0 0 860 290" role="img" aria-label="Perpendicular-flow Reynolds number plotted against altitude above sea level"></svg>
+<p class="muted" style="font-size:.87rem">Both graphs use airflow perpendicular to the cable. The Reynolds number graph uses a logarithmic vertical scale with zero shown at the bottom. At zero crossflow, Re = 0 and C<sub>D</sub> is undefined. The first points with a very small Re can show a high C<sub>D</sub> while the actual wind load remains small. The dashed Re = 100 line marks the end of the lowest-Re segment of the coefficient formula.</p>
+<h2>How it is calculated</h2>
+<p>The winch is at (0, 0). The upper tension is a limit, not a force that must be used. The calculation searches for the highest quasi-static cable path with a nondecreasing horizontal position, while keeping the upper tension at or below that limit. When the whole cable cannot be lifted, the unused length lies level on the ground and the suspended cable leaves the ground horizontally. Ground friction and winch torque are not included.</p>
+<div class="formula">
+  w = μg, &nbsp; g = 9.81 m/s²; &nbsp; L = L<sub>ground</sub> + L<sub>suspended</sub>.<br>
+  Local altitude = start altitude + y(s). Temperature T(s), pressure and air density ρ(s) follow the 1976 U.S. Standard Atmosphere at that altitude.<br>
+  Wind profile: H = min(1,000 m, max(10 m, y<sub>top</sub>)); &nbsp; α = ln(2) / ln(100) ≈ 0.1505;<br>
+  U(y) = U<sub>top</sub> [min(max(y, 10 m), H) / H]<sup>α</sup>. The calculated top height and wind profile are solved together.<br>
+  Re<sub>⊥</sub> = ρ(s) |A<sub>⊥</sub>| d / μ<sub>air</sub>(s); &nbsp; C<sub>D</sub> = f(Re<sub>⊥</sub>) from a circular-cylinder correlation.<br>
+  At glider altitude, TAS ≈ IAS × √(ρ<sub>sea level</sub> / ρ<sub>top</sub>). This low-speed estimate treats IAS as calibrated/equivalent airspeed; instrument, position and compressibility corrections are omitted.<br>
+  For glider true airspeed V<sub>a</sub> = TAS and air-relative climb angle γ, glider ground velocity is v<sub>g</sub> = (U<sub>top</sub> − V<sub>a</sub> cos γ, V<sub>a</sub> sin γ). Positive horizontal velocity means drifting away from the winch.<br>
+  Estimated local cable velocity = (s / L<sub>suspended</sub>)v<sub>g</sub>; local relative airflow A = (U(y), 0) − cable velocity.<br>
+  True crossflow A<sub>⊥</sub> = A − (A · t)t; sea-level-equivalent crossflow = |A<sub>⊥</sub>|√(ρ(s)/ρ<sub>sea level</sub>). The cable load uses the true crossflow: q = ½ρ(s)C<sub>D</sub>d |A<sub>⊥</sub>| A<sub>⊥</sub>, &nbsp; q<sub>x</sub> = x-component of q.<br>
+  Suspended-cable equilibrium: r′ = P/|P|, &nbsp; P′ = (0, w) − q; &nbsp; maximize y<sub>top</sub> subject to |P<sub>top</sub>| ≤ T<sub>limit</sub>; &nbsp; total F<sub>x</sub> = ∫ q<sub>x</sub> ds.<br>
+  Ideal no-wind ceiling: h<sub>max</sub> = min(L, T<sub>limit</sub> / (μg)).
+</div>
+<p class="muted">The wind profile is an illustrative power-law approximation: for a top at or above 1,000 m, the 10 m speed is half the entered top speed, including for a top at 5,500 m. Wind is held at its 10 m value below 10 m and at its top value above H. The 1,000 m layer depth and 2:1 ratio are modeling assumptions; actual wind profiles depend on terrain, weather and atmospheric stability. The height y is above the start point. Temperature, pressure and air density follow the dry-air U.S. Standard Atmosphere, 1976 (15 °C and 1.225 kg/m³ at sea level), using its 0–11 km, 11–20 km, and 20–32 km geopotential-altitude layers. This is a reference profile, not a weather forecast. Air viscosity uses the local temperature and Sutherland's law; the drag coefficient uses the piecewise infinite-cylinder fit in NASA/CR–2012–217665, Table 3.5, with Reynolds number limited to its stated range. This assumes an approximately smooth, circular, unstretched cable. The moving-cable velocity ramp is an engineering approximation; actual braid roughness, gusts and cable motion can change loads. Axial surface friction and ground friction are omitted. <a href="https://www.energy.gov/cmei/systems/windexchange/small-wind-guidebook">Wind-shear reference</a>; <a href="https://repository.library.noaa.gov/view/noaa/53810/noaa_53810_DS1.pdf">boundary-layer reference</a>; <a href="https://www.ngdc.noaa.gov/stp/space-weather/online-publications/miscellaneous/us-standard-atmosphere-1976/us-standard-atmosphere_st76-1562_noaa.pdf">standard-atmosphere reference</a>; <a href="https://www.grc.nasa.gov/www/BGH/viscosity.html">viscosity reference</a>; <a href="https://ntrs.nasa.gov/api/citations/20120013601/downloads/20120013601.pdf">cylinder drag correlation</a>; <a href="https://link.springer.com/article/10.1007/s13272-022-00581-7">moving tether approximation</a>; <a href="https://ifatwww.et.uni-magdeburg.de/ifac2020/media/pdfs/3733.pdf">ground-contact reference</a>.</p>
+<h2>Points on the wind-loaded cable</h2>
+<div class="table-wrap"><table><thead><tr><th>Cable distance s</th><th>Horizontal x</th><th>Height y</th><th>Altitude ASL</th><th>Wind speed</th><th>Relative airflow</th><th>True crossflow</th><th>Equivalent crossflow</th><th>Standard temperature</th><th>Air density</th><th>Reynolds number</th><th>Drag coefficient</th><th>Angle</th><th>Local qₓ</th><th>Accumulated Fₓ</th></tr></thead><tbody id="points"></tbody></table></div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const fmt = (v, digits=1) => new Intl.NumberFormat('en-US', {maximumFractionDigits:digits}).format(v);
+  function parseDecimal(raw) {
+    const value=String(raw).trim();
+    if (!/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)(?:[eE][+-]?\d+)?$/.test(value)) return NaN;
+    return Number(value.replace(',', '.'));
+  }
+  const N = 240;
+  const metrics = ['xTop','yTop','angle','horizontal','fxWind','qxTop','tStart','pxTop','rhoStart','rhoTop','wind10','windTop','airspeedResult','tasTop','groundSpeedTotal','tempStart','tempTop','cdTop','reTop','tTopUsed','suspended','onGround','liftAngle','groundSpeed','climbRate','relativeTop','crossflowTop','crossflowEquivalentTop'];
+  const exports=['downloadReport','downloadPath','downloadData'];
+  let lastResult=null;
+  const boundaryHeight=1000, referenceHeight=10, shearExponent=Math.log(2)/Math.log(boundaryHeight/referenceHeight);
+  const profileHeight=topHeight=>Math.min(boundaryHeight,Math.max(referenceHeight,topHeight));
+  function windAtHeight(y,topSpeed,topHeight) {
+    const H=profileHeight(topHeight);
+    return topSpeed*Math.pow(Math.min(Math.max(y,referenceHeight),H)/H,shearExponent);
+  }
+
+  function airProperties(geometricAltitude) {
+    const earthRadius=6356766, g0=9.80665, R=287.05287;
+    const T0=288.15, p0=101325, lapse=0.0065;
+    const H=earthRadius*Math.max(0,geometricAltitude)/(earthRadius+Math.max(0,geometricAltitude));
+    const T11=T0-lapse*11000;
+    const p11=p0*Math.pow(T11/T0,g0/(R*lapse));
+    let T,p;
+    if(H<=11000) {
+      T=T0-lapse*H;
+      p=p0*Math.pow(T/T0,g0/(R*lapse));
+    } else if(H<=20000) {
+      T=T11;
+      p=p11*Math.exp(-g0*(H-11000)/(R*T11));
+    } else if(H<=32000) {
+      const p20=p11*Math.exp(-g0*9000/(R*T11));
+      T=T11+0.001*(H-20000);
+      p=p20*Math.pow(T/T11,-g0/(R*0.001));
+    } else {
+      return {rho:NaN,viscosity:NaN,temperatureC:NaN};
+    }
+    const viscosity=1.7894e-5*Math.pow(T/T0,1.5)*(T0+110.4)/(T+110.4);
+    return {rho:p/(R*T),viscosity:viscosity,temperatureC:T-273.15};
+  }
+
+  const seaLevelDensity=1.225;
+  function trueAirspeed(indicatedAirspeed,geometricAltitude) {
+    return indicatedAirspeed*Math.sqrt(seaLevelDensity/airProperties(geometricAltitude).rho);
+  }
+
+  // NASA/CR-2012-217665, Table 3.5: C_D = c0 + c1 Re + c2 Re² for an infinite cylinder.
+  function cylinderDrag(reynolds) {
+    const r=Math.min(Math.max(reynolds,0),1e7);
+    let c0,c1,c2;
+    if (r<=100) { c0=3.5645; c1=-0.04215; c2=2.088e-4; }
+    else if (r<=1000) { c0=1.4464; c1=-7.241e-4; c2=2.92e-7; }
+    else if (r<=1e4) { c0=1.0191; c1=-2.21e-5; c2=3.18e-9; }
+    else if (r<=1e5) { c0=1.0897; c1=5.34e-6; c2=-4.01e-11; }
+    else if (r<=1e6) { c0=1.4263; c1=-1.18e-6; c2=1.00e-14; }
+    else { c0=0.32731; c1=2.76e-8; c2=-5.46e-16; }
+    return c0+c1*r+c2*r*r;
+  }
+
+  // Search the initial force components and the suspended length. Ground contact
+  // requires a horizontal tangent whenever any cable remains on the ground.
+  function solveMaximum(L,w,topSpeed,d,tensionLimit,startAltitude,motion=null) {
+    const moving=motion!==null && motion.ias>0;
+    function groundMotion(topHeight) {
+      if(!moving) return {vx:0,vy:0};
+      const tas=trueAirspeed(motion.ias,startAltitude+topHeight);
+      return {vx:topSpeed-tas*Math.cos(motion.climbAngle),vy:tas*Math.sin(motion.climbAngle)};
+    }
+    function relativeFlow(s,y,topHeight,S,velocity) {
+      const U=windAtHeight(y,topSpeed,topHeight);
+      const fraction=moving?Math.min(1,Math.max(0,s/S)):0;
+      return {U,vx:U-fraction*velocity.vx,vy:-fraction*velocity.vy};
+    }
+    function point(s,v,topHeight,S,localS=s) {
+      const [x,y,px,py,fx]=v, tension=Math.hypot(px,py);
+      const tx=tension>0?px/tension:0, ty=tension>0?py/tension:0;
+      const flow=relativeFlow(localS,y,topHeight,S,groundMotion(topHeight));
+      const along=flow.vx*tx+flow.vy*ty;
+      const ux=flow.vx-along*tx, uy=flow.vy-along*ty, normal=Math.hypot(ux,uy);
+      const air=airProperties(startAltitude+y), re=air.rho*normal*d/air.viscosity;
+      const cd=normal>0?cylinderDrag(re):null;
+      return {s,x,y,px,py,fx,rho:air.rho,temperatureC:air.temperatureC,U:flow.U,apparent:Math.hypot(flow.vx,flow.vy),normal,normalEquivalent:normal*Math.sqrt(air.rho/seaLevelDensity),re,cd,
+        qx:0.5*d*air.rho*(cd??0)*normal*ux,
+        angle:tension>0?Math.atan2(py,px)*180/Math.PI:0};
+    }
+    if (topSpeed===0 && !moving) {
+      const suspended=Math.min(L,tensionLimit/w), ground=L-suspended;
+      if (startAltitude+suspended>32000) return null;
+      const points=Array.from({length:N+1},(_,i)=>{
+        const s=L*i/N, risen=Math.max(0,s-ground);
+        return point(s,[Math.min(s,ground),risen,0,w*risen,0],suspended,suspended);
+      });
+      return {points,suspended,ground,H:0,V:0,liftAngle:ground>1e-7?0:90,ideal:true};
+    }
+    function integrate(H,V,S,topHeight,steps,keepStates) {
+      let v=[0,0,H,V,0], minPx=H, minY=0;
+      const ds=S/steps, states=keepStates?[v]:null;
+      const velocity=groundMotion(topHeight);
+      if(!Number.isFinite(velocity.vx) || !Number.isFinite(velocity.vy))return null;
+      function slope(a,s) {
+        const t=Math.hypot(a[2],a[3]);
+        if (!(t>1e-10)) return null;
+        const tx=a[2]/t, ty=a[3]/t;
+        const flow=relativeFlow(s,a[1],topHeight,S,velocity);
+        const along=flow.vx*tx+flow.vy*ty;
+        const ux=flow.vx-along*tx, uy=flow.vy-along*ty, normal=Math.hypot(ux,uy);
+        const air=airProperties(startAltitude+a[1]);
+        if (!Number.isFinite(air.rho)) return null;
+        const re=air.rho*normal*d/air.viscosity;
+        const cd=normal>0?cylinderDrag(re):0;
+        const q=0.5*d*air.rho*cd*normal;
+        return [tx,ty,-q*ux,w-q*uy,q*ux];
+      }
+      for(let i=0;i<steps;i++) {
+        const k1=slope(v,i*ds); if(!k1) return null;
+        const k2=slope(v.map((a,j)=>a+ds*k1[j]/2),(i+0.5)*ds); if(!k2) return null;
+        const k3=slope(v.map((a,j)=>a+ds*k2[j]/2),(i+0.5)*ds); if(!k3) return null;
+        const k4=slope(v.map((a,j)=>a+ds*k3[j]),(i+1)*ds); if(!k4) return null;
+        v=v.map((a,j)=>a+ds*(k1[j]+2*k2[j]+2*k3[j]+k4[j])/6);
+        if(!v.every(Number.isFinite)) return null;
+        minPx=Math.min(minPx,v[2]); minY=Math.min(minY,v[1]);
+        if(keepStates) states.push(v);
+      }
+      return {v,minPx,minY,states};
+    }
+    function evaluate(H,V,S,steps=64,keepStates=false) {
+      let estimate=Math.min(S,Math.max(0,32000-startAltitude));
+      for(let i=0;i<24;i++) {
+        const result=integrate(H,V,S,estimate,steps,keepStates);
+        if(!result) return null;
+        const height=result.v[1];
+        if(Math.abs(height-estimate)<0.001 || (!moving && height>=boundaryHeight && estimate>=boundaryHeight))
+          return result;
+        estimate=height;
+      }
+      return null;
+    }
+    const isAllowed=r=>r && r.minPx>=-1e-5 && r.minY>=-1e-5 &&
+      Math.hypot(r.v[2],r.v[3])<=tensionLimit+0.001;
+    function candidate(H,steps=64,iterations=17) {
+      if(!(H>0 && H<tensionLimit)) return null;
+      const full=evaluate(H,0,L,steps);
+      if(isAllowed(full)) {
+        let low=0,high=Math.sqrt(tensionLimit*tensionLimit-H*H),result=full;
+        for(let i=0;i<iterations;i++) {
+          const middle=(low+high)/2,tryPath=evaluate(H,middle,L,steps);
+          if(isAllowed(tryPath)) { low=middle; result=tryPath; }
+          else high=middle;
+        }
+        return {H,V:low,S:L,height:result.v[1]};
+      }
+      let low=0,high=L,result=null;
+      for(let i=0;i<iterations;i++) {
+        const middle=(low+high)/2,tryPath=evaluate(H,0,middle,steps);
+        if(isAllowed(tryPath)) { low=middle; result=tryPath; }
+        else high=middle;
+      }
+      return result?{H,V:0,S:low,height:result.v[1]}:null;
+    }
+    const count=40, sample=[];
+    let best=null,bestIndex=-1;
+    for(let i=1;i<=count;i++) {
+      const H=tensionLimit*Math.pow(i/(count+1),1.45);
+      const option=candidate(H);
+      sample.push(H);
+      if(option && (!best || option.height>best.height)) {best=option;bestIndex=i-1;}
+    }
+    if(!best) return null;
+    let left=sample[Math.max(0,bestIndex-1)],right=sample[Math.min(count-1,bestIndex+1)];
+    // A one-dimensional search resolves both the tension and ground-contact boundary.
+    for(let i=0;i<22;i++) {
+      const h1=left+(right-left)*0.382,h2=left+(right-left)*0.618;
+      const a=candidate(h1),b=candidate(h2);
+      if(a && a.height>best.height) best=a;
+      if(b && b.height>best.height) best=b;
+      if((a?.height??-Infinity)>(b?.height??-Infinity)) right=h2;
+      else left=h1;
+    }
+    const refined=candidate(best.H,N,23);
+    if(!refined) return null;
+    const {H,V,S}=refined,ground=L-S;
+    const solved=evaluate(H,V,S,N,true);
+    if(!isAllowed(solved)) return null;
+    const points=Array.from({length:N+1},(_,i)=>{
+      const s=L*i/N;
+      if(ground>1e-6 && s<=ground) return point(s,[s,0,H,0,0],solved.v[1],S,0);
+      const u=(s-ground)/S*N,j=Math.min(N-1,Math.floor(u)),fraction=u-j;
+      const state=solved.states[j].map((a,k)=>a+(solved.states[j+1][k]-a)*fraction);
+      state[0]+=ground;
+      return point(s,state,solved.v[1],S,s-ground);
+    });
+    return {points,suspended:S,ground,H,V,liftAngle:Math.atan2(V,H)*180/Math.PI,ideal:false};
+  }
+
+  function drawPath(base,wind,showReference,ground,indicatedKmh,trueKmh) {
+    const svg=$('chart'), x0=84, y0=431, pw=717, ph=344;
+    const end=wind[N], calmEnd=base[N];
+    const minX=Math.min(0,...wind.map(p=>p.x),...base.map(p=>p.x));
+    const maxX=Math.max(0,...wind.map(p=>p.x),...base.map(p=>p.x));
+    const spanX=Math.max(maxX-minX,1), xLeft=minX<0?minX-0.08*spanX:0, xRight=maxX+0.08*spanX;
+    const minY=Math.min(0,...wind.map(p=>p.y),...base.map(p=>p.y));
+    const maxY=Math.max(0,...wind.map(p=>p.y),...base.map(p=>p.y));
+    const yMin=minY<0?minY*1.15:0, yMax=maxY>0?maxY*1.16:1;
+    const px=x=>x0+pw*(x-xLeft)/(xRight-xLeft);
+    const py=y=>y0-ph*(y-yMin)/(yMax-yMin);
+    const shape=pts=>pts.map((p,i)=>(i?'L':'M')+px(p.x).toFixed(2)+','+py(p.y).toFixed(2)).join(' ');
+    const xt=Array.from({length:5},(_,i)=>xLeft+i*(xRight-xLeft)/4);
+    const yt=Array.from({length:5},(_,i)=>yMin+(yMax-yMin)*i/4);
+    const grids=xt.map(x=>'<line x1="'+px(x)+'" y1="'+(y0-ph)+'" x2="'+px(x)+'" y2="'+y0+'" stroke="#ebeff4"/><text x="'+px(x)+'" y="'+(y0+26)+'" text-anchor="middle" fill="#526176" font-size="13">'+fmt(x,0)+'</text>').join('')+
+      yt.map(y=>'<line x1="'+x0+'" y1="'+py(y)+'" x2="'+(x0+pw)+'" y2="'+py(y)+'" stroke="#ebeff4"/><text x="'+(x0-10)+'" y="'+(py(y)+5)+'" text-anchor="end" fill="#526176" font-size="13">'+fmt(y,0)+'</text>').join('');
+    svg.innerHTML='<title>Hanging cable path with indicated and true glider airspeed</title>'+
+      '<desc>Indicated airspeed '+fmt(indicatedKmh,1)+' kilometres per hour; true airspeed at the glider '+fmt(trueKmh,1)+' kilometres per hour. Upper end: horizontal '+fmt(end.x,1)+' metres, height '+fmt(end.y,1)+' metres.</desc>'+
+      grids+'<line x1="'+x0+'" y1="'+py(0)+'" x2="'+(x0+pw)+'" y2="'+py(0)+'" stroke="#8492a5"/>'+
+      '<line x1="'+x0+'" y1="'+(y0-ph)+'" x2="'+x0+'" y2="'+y0+'" stroke="#8492a5"/>'+
+      (showReference?'<path d="'+shape(base)+'" fill="none" stroke="#7f8da0" stroke-dasharray="7 5" stroke-width="2.5"/>':'')+
+      '<path d="'+shape(wind)+'" fill="none" stroke="#0969da" stroke-width="4" stroke-linecap="round"/>'+
+      '<circle cx="'+px(0)+'" cy="'+py(0)+'" r="6" fill="#087f70"/>'+
+      (showReference?'<circle cx="'+px(calmEnd.x)+'" cy="'+py(calmEnd.y)+'" r="5" fill="#fff" stroke="#7f8da0" stroke-width="2"/>':'')+
+      '<circle cx="'+px(end.x)+'" cy="'+py(end.y)+'" r="6" fill="#bd512b"/>'+
+      '<text x="'+(px(0)+11)+'" y="'+(py(0)-13)+'" fill="#075a51" font-size="15" font-weight="600">Winch</text>'+
+      (ground>0.1?'<circle cx="'+px(ground)+'" cy="'+py(0)+'" r="5" fill="#087f70"/>'+
+        '<text x="'+(px(ground)+9)+'" y="'+(py(0)-13)+'" fill="#075a51" font-size="14">Lift-off · 0°</text>':'')+
+      '<text x="'+(px(end.x)-7)+'" y="'+(py(end.y)-14)+'" text-anchor="end" fill="#a43b19" font-size="15" font-weight="600">End · '+fmt(end.angle,1)+'°</text>'+
+      '<text x="'+(x0+8)+'" y="42" fill="#2168a7" font-size="16" font-weight="700">Indicated airspeed (IAS): '+fmt(indicatedKmh,1)+' km/h</text>'+
+      '<text x="'+(x0+8)+'" y="67" fill="#2168a7" font-size="16" font-weight="700">True airspeed (TAS) at glider: '+fmt(trueKmh,1)+' km/h</text>'+
+      '<text x="'+(x0+pw/2)+'" y="493" text-anchor="middle" fill="#2e3c50" font-size="15">Horizontal distance x (m)</text>'+
+      '<text transform="translate(21 '+(y0-ph/2)+') rotate(-90)" text-anchor="middle" fill="#2e3c50" font-size="15">Height y (m)</text>';
+  }
+
+  function drawLoad(wind,L) {
+    const svg=$('loadChart'), x0=84, y0=230, pw=717, ph=166;
+    const top=Math.max(0,...wind.map(p=>p.qx)), yMax=top>0?top*1.2:1;
+    const px=s=>x0+pw*s/(L*1.08), py=q=>y0-ph*q/yMax;
+    const path=wind.map((p,i)=>(i?'L':'M')+px(p.s).toFixed(2)+','+py(p.qx).toFixed(2)).join(' ');
+    const grids=Array.from({length:5},(_,i)=>{
+      const s=i*L/4, q=i*yMax/4;
+      return '<line x1="'+px(s)+'" y1="'+(y0-ph)+'" x2="'+px(s)+'" y2="'+y0+'" stroke="#ebeff4"/>'+
+             '<text x="'+px(s)+'" y="'+(y0+25)+'" text-anchor="middle" fill="#526176" font-size="13">'+fmt(s,0)+'</text>'+
+             '<line x1="'+x0+'" y1="'+py(q)+'" x2="'+(x0+pw)+'" y2="'+py(q)+'" stroke="#ebeff4"/>'+
+             '<text x="'+(x0-10)+'" y="'+(py(q)+5)+'" text-anchor="end" fill="#526176" font-size="13">'+fmt(q,top<0.01?4:3)+'</text>';
+    }).join('');
+    svg.innerHTML='<title>Local x-direction aerodynamic load</title><desc>At the upper end '+fmt(wind[N].qx,4)+' newtons per metre. Total '+fmt(wind[N].fx,1)+' newtons.</desc>'+
+      grids+'<path d="'+path+'" fill="none" stroke="#dc7921" stroke-width="3.5"/>'+
+      '<text x="'+(x0+pw/2)+'" y="285" text-anchor="middle" fill="#2e3c50" font-size="15">Distance along cable s (m)</text>'+
+      '<text transform="translate(19 '+(y0-ph/2)+') rotate(-90)" text-anchor="middle" fill="#2e3c50" font-size="15">x-load (N/m)</text>';
+  }
+
+  function drawWindSpeed(wind,L,topSpeed,indicatedAirspeed,trueSpeed) {
+    const svg=$('speedChart'), x0=84, y0=230, pw=717, ph=166;
+    const yMax=Math.max(1,topSpeed,trueSpeed,...wind.map(p=>p.apparent))*1.2;
+    const px=s=>x0+pw*s/(L*1.08), py=u=>y0-ph*u/yMax;
+    const path=key=>wind.map((p,i)=>(i?'L':'M')+px(p.s).toFixed(2)+','+py(p[key]).toFixed(2)).join(' ');
+    const grids=Array.from({length:5},(_,i)=>{
+      const s=i*L/4, u=i*yMax/4;
+      return '<line x1="'+px(s)+'" y1="'+(y0-ph)+'" x2="'+px(s)+'" y2="'+y0+'" stroke="#ebeff4"/>'+
+             '<text x="'+px(s)+'" y="'+(y0+25)+'" text-anchor="middle" fill="#526176" font-size="13">'+fmt(s,0)+'</text>'+
+             '<line x1="'+x0+'" y1="'+py(u)+'" x2="'+(x0+pw)+'" y2="'+py(u)+'" stroke="#ebeff4"/>'+
+             '<text x="'+(x0-10)+'" y="'+(py(u)+5)+'" text-anchor="end" fill="#526176" font-size="13">'+fmt(u,1)+'</text>';
+    }).join('');
+    svg.innerHTML='<title>Indicated and true glider airspeed, ambient wind and airflow</title><desc>Indicated airspeed '+fmt(indicatedAirspeed,2)+' metres per second; true airspeed at glider '+fmt(trueSpeed,2)+' metres per second. At the upper end: ambient wind '+fmt(wind[N].U,2)+', relative airflow '+fmt(wind[N].apparent,2)+', and perpendicular crossflow '+fmt(wind[N].normal,2)+' metres per second.</desc>'+
+      grids+'<path d="'+path('U')+'" fill="none" stroke="#087f70" stroke-width="3"/>'+
+      '<path d="'+path('apparent')+'" fill="none" stroke="#8258a8" stroke-width="3"/>'+
+      '<path d="'+path('normal')+'" fill="none" stroke="#dc7921" stroke-width="3" stroke-dasharray="7 4"/>'+
+      (indicatedAirspeed>0?'<line x1="'+x0+'" y1="'+py(indicatedAirspeed)+'" x2="'+px(L)+'" y2="'+py(indicatedAirspeed)+'" stroke="#527baf" stroke-width="2" stroke-dasharray="2 5"/>':'')+
+      (trueSpeed>0?'<line x1="'+x0+'" y1="'+py(trueSpeed)+'" x2="'+px(L)+'" y2="'+py(trueSpeed)+'" stroke="#184b91" stroke-width="2.5" stroke-dasharray="7 4"/>':'')+
+      '<text x="90" y="36" fill="#087f70" font-size="13">Ambient wind</text>'+
+      '<text x="245" y="36" fill="#8258a8" font-size="13">Relative airflow</text>'+
+      '<text x="430" y="36" fill="#b25613" font-size="13">Perpendicular crossflow</text>'+
+      '<text x="90" y="57" fill="#527baf" font-size="13" font-weight="700">IAS: '+fmt(indicatedAirspeed*3.6,1)+' km/h</text>'+
+      '<text x="300" y="57" fill="#184b91" font-size="13" font-weight="700">TAS at glider: '+fmt(trueSpeed*3.6,1)+' km/h</text>'+
+      '<text x="'+(x0+pw/2)+'" y="285" text-anchor="middle" fill="#2e3c50" font-size="15">Distance along cable s (m)</text>'+
+      '<text transform="translate(19 '+(y0-ph/2)+') rotate(-90)" text-anchor="middle" fill="#2e3c50" font-size="15">Speed (m/s)</text>';
+  }
+
+  function drawTemperature(wind,startAltitude) {
+    const svg=$('temperatureChart'), x0=84, y0=230, pw=717, ph=166;
+    const heights=wind.map(p=>startAltitude+p.y);
+    const low=Math.min(...heights), high=Math.max(...heights), xSpan=Math.max(high-low,1);
+    const xMin=Math.max(0,low-0.03*xSpan), xMax=high+0.07*xSpan;
+    const temperatures=wind.map(p=>p.temperatureC);
+    const tLow=Math.min(...temperatures), tHigh=Math.max(...temperatures), tSpan=Math.max(tHigh-tLow,2);
+    const tMin=tLow-0.12*tSpan, tMax=tHigh+0.12*tSpan;
+    const px=z=>x0+pw*(z-xMin)/(xMax-xMin), py=t=>y0-ph*(t-tMin)/(tMax-tMin);
+    const path=wind.map((p,i)=>(i?'L':'M')+px(startAltitude+p.y).toFixed(2)+','+py(p.temperatureC).toFixed(2)).join(' ');
+    const grids=Array.from({length:5},(_,i)=>{
+      const altitude=xMin+i*(xMax-xMin)/4, temp=tMin+i*(tMax-tMin)/4;
+      return '<line x1="'+px(altitude)+'" y1="'+(y0-ph)+'" x2="'+px(altitude)+'" y2="'+y0+'" stroke="#ebeff4"/>'+
+             '<text x="'+px(altitude)+'" y="'+(y0+25)+'" text-anchor="middle" fill="#526176" font-size="13">'+fmt(altitude,0)+'</text>'+
+             '<line x1="'+x0+'" y1="'+py(temp)+'" x2="'+(x0+pw)+'" y2="'+py(temp)+'" stroke="#ebeff4"/>'+
+             '<text x="'+(x0-10)+'" y="'+(py(temp)+5)+'" text-anchor="end" fill="#526176" font-size="13">'+fmt(temp,1)+'</text>';
+    }).join('');
+    svg.innerHTML='<title>Standard-atmosphere temperature versus altitude</title><desc>Start '+fmt(temperatures[0],1)+' degrees Celsius, upper end '+fmt(temperatures[N],1)+' degrees Celsius. Based on the 1976 U.S. Standard Atmosphere.</desc>'+
+      grids+'<path d="'+path+'" fill="none" stroke="#ad4c40" stroke-width="3.5"/>'+
+      '<text x="'+(x0+pw/2)+'" y="285" text-anchor="middle" fill="#2e3c50" font-size="15">Altitude above sea level (m)</text>'+
+      '<text transform="translate(19 '+(y0-ph/2)+') rotate(-90)" text-anchor="middle" fill="#2e3c50" font-size="15">Standard temperature (°C)</text>';
+  }
+
+  function drawDrag(wind,startAltitude) {
+    const svg=$('dragChart'), x0=84, y0=230, pw=717, ph=166;
+    const values=wind.filter(p=>p.cd!==null && Number.isFinite(p.cd));
+    const heights=wind.map(p=>startAltitude+p.y);
+    const low=Math.min(...heights), high=Math.max(...heights), xSpan=Math.max(high-low,1);
+    const xMin=Math.max(0,low-0.03*xSpan), xMax=high+0.07*xSpan;
+    const cMin=values.length?Math.min(...values.map(p=>p.cd)):0;
+    const cMax=values.length?Math.max(...values.map(p=>p.cd)):1;
+    const cSpan=Math.max(cMax-cMin,0.05);
+    const yMin=Math.max(0,cMin-0.15*cSpan), yMax=cMax+0.15*cSpan;
+    const px=z=>x0+pw*(z-xMin)/(xMax-xMin), py=cd=>y0-ph*(cd-yMin)/(yMax-yMin);
+    let penDown=false;
+    const path=wind.map(p=>{
+      if (p.cd===null || !Number.isFinite(p.cd)) { penDown=false; return ''; }
+      const command=penDown?'L':'M';
+      penDown=true;
+      return command+px(startAltitude+p.y).toFixed(2)+','+py(p.cd).toFixed(2);
+    }).filter(Boolean).join(' ');
+    const grids=Array.from({length:5},(_,i)=>{
+      const altitude=xMin+i*(xMax-xMin)/4, cd=yMin+i*(yMax-yMin)/4;
+      return '<line x1="'+px(altitude)+'" y1="'+(y0-ph)+'" x2="'+px(altitude)+'" y2="'+y0+'" stroke="#ebeff4"/>'+
+             '<text x="'+px(altitude)+'" y="'+(y0+25)+'" text-anchor="middle" fill="#526176" font-size="13">'+fmt(altitude,0)+'</text>'+
+             '<line x1="'+x0+'" y1="'+py(cd)+'" x2="'+(x0+pw)+'" y2="'+py(cd)+'" stroke="#ebeff4"/>'+
+             '<text x="'+(x0-10)+'" y="'+(py(cd)+5)+'" text-anchor="end" fill="#526176" font-size="13">'+fmt(cd,2)+'</text>';
+    }).join('');
+    svg.innerHTML='<title>Drag coefficient versus altitude</title><desc>'+
+      (values.length?'Local crossflow coefficient ranges from '+fmt(cMin,3)+' to '+fmt(cMax,3)+'.':'No crossflow: drag coefficient is undefined.')+'</desc>'+
+      grids+(values.length?'<path d="'+path+'" fill="none" stroke="#8258a8" stroke-width="3.5"/>':
+      '<text x="430" y="148" text-anchor="middle" fill="#536276" font-size="17">No crossflow — Cᴅ is undefined</text>')+
+      '<text x="'+(x0+pw/2)+'" y="285" text-anchor="middle" fill="#2e3c50" font-size="15">Altitude above sea level (m)</text>'+
+      '<text transform="translate(19 '+(y0-ph/2)+') rotate(-90)" text-anchor="middle" fill="#2e3c50" font-size="15">Drag coefficient Cᴅ</text>';
+  }
+
+  function drawReynolds(wind,startAltitude) {
+    const svg=$('reChart'), x0=84, y0=230, pw=717, ph=166;
+    const heights=wind.map(p=>startAltitude+p.y);
+    const low=Math.min(...heights), high=Math.max(...heights), xSpan=Math.max(high-low,1);
+    const xMin=Math.max(0,low-0.03*xSpan), xMax=high+0.07*xSpan;
+    const peak=Math.max(0,...wind.map(p=>p.re)), logMax=Math.max(0.5,Math.log10(1+peak)*1.06);
+    const px=z=>x0+pw*(z-xMin)/(xMax-xMin), py=re=>y0-ph*Math.log10(1+re)/logMax;
+    const path=wind.map((p,i)=>(i?'L':'M')+px(startAltitude+p.y).toFixed(2)+','+py(p.re).toFixed(2)).join(' ');
+    const grids=Array.from({length:5},(_,i)=>{
+      const altitude=xMin+i*(xMax-xMin)/4;
+      return '<line x1="'+px(altitude)+'" y1="'+(y0-ph)+'" x2="'+px(altitude)+'" y2="'+y0+'" stroke="#ebeff4"/>'+
+             '<text x="'+px(altitude)+'" y="'+(y0+25)+'" text-anchor="middle" fill="#526176" font-size="13">'+fmt(altitude,0)+'</text>';
+    }).join('');
+    const ticks=[0];
+    for(let exponent=0;exponent<=Math.ceil(logMax);exponent++){
+      const re=10**exponent;
+      if(Math.log10(1+re)<=logMax)ticks.push(re);
+    }
+    const horizontal=ticks.map(re=>'<line x1="'+x0+'" y1="'+py(re)+'" x2="'+(x0+pw)+'" y2="'+py(re)+'" stroke="#ebeff4"/>'+
+      '<text x="'+(x0-10)+'" y="'+(py(re)+5)+'" text-anchor="end" fill="#526176" font-size="13">'+fmt(re,0)+'</text>').join('');
+    const reference=peak>100?'<line x1="'+x0+'" y1="'+py(100)+'" x2="'+(x0+pw)+'" y2="'+py(100)+'" stroke="#a45f22" stroke-dasharray="6 4"/>'+
+      '<text x="'+(x0+pw-5)+'" y="'+(py(100)-6)+'" text-anchor="end" fill="#88501f" font-size="13">Re = 100</text>':'';
+    svg.innerHTML='<title>Perpendicular-flow Reynolds number versus altitude</title><desc>Logarithmic vertical scale with zero at the bottom. Reynolds number starts at '+fmt(wind[0].re,2)+' and peaks at '+fmt(peak,1)+'. A dashed line marks Re = 100 when within range.</desc>'+
+      grids+horizontal+reference+'<path d="'+path+'" fill="none" stroke="#a34b61" stroke-width="3.5"/>'+
+      '<text x="'+(x0+pw/2)+'" y="285" text-anchor="middle" fill="#2e3c50" font-size="15">Altitude above sea level (m)</text>'+
+      '<text transform="translate(19 '+(y0-ph/2)+') rotate(-90)" text-anchor="middle" fill="#2e3c50" font-size="15">Reynolds number Re⊥ (log scale)</text>';
+  }
+
+  function saveFile(name,type,contents) {
+    const url=URL.createObjectURL(new Blob([contents],{type}));
+    const link=document.createElement('a');
+    link.href=url;
+    link.download=name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }
+
+  function escapeHtml(value) {
+    const entities={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+    return String(value).replace(/[&<>"']/g,ch=>entities[ch]);
+  }
+
+  function reportHtml() {
+    const {parameters,summary,points,startAltitude}=lastResult;
+    const inputRows=parameters.map(([name,value])=>'<tr><th>'+escapeHtml(name)+'</th><td>'+escapeHtml(value)+'</td></tr>').join('');
+    const resultRows=summary.map(([name,value])=>'<tr><th>'+escapeHtml(name)+'</th><td>'+escapeHtml(value)+'</td></tr>').join('');
+    const sampleRows=[0,60,120,180,240].map(i=>{
+      const p=points[i];
+      return '<tr><td>'+fmt(p.s,0)+'</td><td>'+fmt(p.x,2)+'</td><td>'+fmt(p.y,2)+'</td><td>'+fmt(startAltitude+p.y,2)+'</td><td>'+fmt(p.U,2)+'</td><td>'+fmt(p.apparent,2)+'</td><td>'+fmt(p.normal,2)+'</td><td>'+fmt(p.normalEquivalent,2)+'</td><td>'+fmt(p.temperatureC,2)+'</td><td>'+fmt(p.re,0)+'</td><td>'+(p.cd===null?'—':fmt(p.cd,3))+'</td><td>'+fmt(p.qx,4)+'</td></tr>';
+    }).join('');
+    const figures=[['chart','Cable path and glider airspeed'],['loadChart','Horizontal aerodynamic load'],['speedChart','Airspeed, wind and airflow'],['temperatureChart','Standard-atmosphere temperature versus altitude'],['dragChart','Drag coefficient versus altitude'],['reChart','Reynolds number versus altitude']]
+      .map(([id,label])=>'<section class="figure"><h2>'+label+'</h2>'+$(id).outerHTML+'</section>').join('');
+    return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+      '<title>Hanging cable calculation report</title><style>body{max-width:1050px;margin:20px auto;padding:0 18px;font:15px system-ui,sans-serif;color:#182439}'+
+      'h1{margin-bottom:6px}h2{margin-top:26px}p{line-height:1.45}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}'+
+      'table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{padding:5px 9px;border-bottom:1px solid #d7dfeb;text-align:left}'+
+      'svg{width:100%;height:auto;background:#fff;border:1px solid #d7dfeb}svg text{font-family:system-ui,sans-serif}.figure{break-inside:avoid}'+
+      '.wide{overflow-x:auto}.wide table{min-width:760px}.note{color:#536276}button{padding:8px 12px}'+
+      '@media print{button{display:none}.grid{gap:12px}body{margin:0;padding:0}.figure{break-inside:avoid}@page{margin:14mm}}</style></head><body>'+
+      '<h1>Hanging cable calculation</h1><p class="note">Saved '+escapeHtml(new Date().toLocaleString())+'. Quasi-static moving-cable estimate.</p>'+
+      '<button onclick="window.print()">Print / save PDF</button><div class="grid"><section><h2>Inputs</h2><table>'+inputRows+'</table></section>'+
+      '<section><h2>Results</h2><table>'+resultRows+'</table></section></div>'+figures+
+      '<h2>Selected cable points</h2><div class="wide"><table><thead><tr><th>s (m)</th><th>x (m)</th><th>Height (m)</th><th>Altitude ASL (m)</th><th>Wind (m/s)</th><th>Relative air (m/s)</th><th>True crossflow (m/s)</th><th>Equivalent crossflow (m/s)</th><th>Standard T (°C)</th><th>Re⊥</th><th>Cᴅ</th><th>qₓ (N/m)</th></tr></thead><tbody>'+sampleRows+'</tbody></table></div>'+
+      '<p class="note">IAS is treated as calibrated/equivalent airspeed; TAS at the glider is estimated from the standard-atmosphere density at its calculated altitude. True crossflow is the airflow perpendicular to the cable; equivalent crossflow is that speed scaled to sea-level density for comparing dynamic pressure with IAS. Instrument, position and compressibility corrections are omitted. The upper tension is a limit. Cable velocity is approximated as rising linearly from the winch to the glider. Glider lift, cable acceleration, winch payout and axial friction are omitted. All '+points.length+' cable points can be downloaded as CSV from the calculator.</p></body></html>';
+  }
+
+  function downloadData() {
+    const {points,startAltitude,indicatedAirspeed,trueSpeed}=lastResult;
+    const header='s_m,x_m,height_m,altitude_asl_m,ambient_wind_m_s,glider_indicated_airspeed_m_s,glider_true_airspeed_m_s,relative_air_m_s,true_crossflow_m_s,sea_level_equivalent_crossflow_m_s,standard_temperature_C,air_density_kg_m3,reynolds_number,drag_coefficient,cable_angle_deg,qx_N_m,accumulated_fx_N';
+    const rows=points.map(p=>[p.s,p.x,p.y,startAltitude+p.y,p.U,indicatedAirspeed,trueSpeed,p.apparent,p.normal,p.normalEquivalent,p.temperatureC,p.rho,p.re,p.cd===null?'':p.cd,p.angle,p.qx,p.fx].join(','));
+    saveFile('hanging_cable_points.csv','text/csv;charset=utf-8','\uFEFF'+[header,...rows].join('\r\n')+'\r\n');
+  }
+
+  function downloadPath() {
+    const svg=$('chart').cloneNode(true);
+    const ns='http://www.w3.org/2000/svg';
+    svg.setAttribute('xmlns',ns);
+    svg.setAttribute('font-family','system-ui, sans-serif');
+    const background=document.createElementNS(ns,'rect');
+    background.setAttribute('width','860');background.setAttribute('height','500');background.setAttribute('fill','#fff');
+    svg.insertBefore(background,svg.firstChild);
+    saveFile('hanging_cable_path.svg','image/svg+xml;charset=utf-8',new XMLSerializer().serializeToString(svg));
+  }
+
+  function draw() {
+    const L=parseDecimal($('length').value), mu=parseDecimal($('mass').value);
+    const topTension=parseDecimal($('topTension').value);
+    const diamMm=parseDecimal($('diameter').value), U=parseDecimal($('wind').value);
+    const startAltitude=parseDecimal($('startAltitude').value);
+    const airspeedKmh=parseDecimal($('airspeed').value), climbDegrees=parseDecimal($('climbAngle').value);
+    const indicatedAirspeed=airspeedKmh/3.6, climbAngle=climbDegrees*Math.PI/180;
+    const w=mu*9.81;
+    let problem='';
+    if (![L,mu,topTension,diamMm,U,startAltitude,airspeedKmh,climbDegrees].every(Number.isFinite) ||
+        L<=0 || mu<=0 || topTension<=0 || diamMm<=0 || U<0 || startAltitude<0 || startAltitude>=32000 ||
+        airspeedKmh<0 || climbDegrees<0 || climbDegrees>=90)
+      problem='Enter positive length, mass, upper tension limit and diameter; nonnegative wind and indicated airspeed; and a climb angle from 0° to below 90°.';
+    const motion=indicatedAirspeed>0 && !problem?{ias:indicatedAirspeed,climbAngle}:null;
+    let base=null, wind=null;
+    if (!problem) {
+      base=solveMaximum(L,w,0,diamMm/1000,topTension,startAltitude);
+      wind=U===0 && !motion?base:solveMaximum(L,w,U,diamMm/1000,topTension,startAltitude,motion);
+      if (!base || !wind)
+        problem='No feasible quasi-static solution was found. Try a lower glider or wind speed or a larger upper tension limit; the atmosphere model covers altitudes up to 32 km.';
+    }
+    $('error').textContent=problem;
+    $('chart').style.visibility=problem?'hidden':'visible';
+    $('loadChart').style.visibility=problem?'hidden':'visible';
+    $('speedChart').style.visibility=problem?'hidden':'visible';
+    $('temperatureChart').style.visibility=problem?'hidden':'visible';
+    $('dragChart').style.visibility=problem?'hidden':'visible';
+    $('reChart').style.visibility=problem?'hidden':'visible';
+    if (problem) {
+      lastResult=null;
+      exports.forEach(id=>$(id).disabled=true);
+      metrics.forEach(id=>$(id).textContent='—');
+      $('points').innerHTML='';
+      return;
+    }
+    const end=wind.points[N];
+    const trueSpeed=trueAirspeed(indicatedAirspeed,startAltitude+end.y);
+    const groundVx=motion?U-trueSpeed*Math.cos(climbAngle):0;
+    const groundVy=motion?trueSpeed*Math.sin(climbAngle):0;
+    $('xTop').textContent=fmt(end.x,2)+' m';
+    $('yTop').textContent=fmt(end.y,2)+' m';
+    $('angle').textContent=fmt(end.angle,2)+'°';
+    $('horizontal').textContent=fmt(wind.H,1)+' N';
+    $('fxWind').textContent=fmt(end.fx,1)+' N';
+    $('qxTop').textContent=fmt(end.qx,4)+' N/m';
+    $('tStart').textContent=fmt(Math.hypot(wind.H,wind.V),1)+' N';
+    $('pxTop').textContent=fmt(end.px,1)+' N';
+    $('rhoStart').textContent=fmt(wind.points[0].rho,3)+' kg/m³';
+    $('rhoTop').textContent=fmt(end.rho,3)+' kg/m³';
+    $('wind10').textContent=fmt(windAtHeight(10,U,end.y),2)+' m/s';
+    $('windTop').textContent=fmt(end.U,2)+' m/s';
+    $('airspeedResult').textContent=fmt(airspeedKmh,1)+' km/h ('+fmt(indicatedAirspeed,2)+' m/s)';
+    $('tasTop').textContent=fmt(trueSpeed*3.6,1)+' km/h ('+fmt(trueSpeed,2)+' m/s)';
+    $('groundSpeedTotal').textContent=fmt(Math.hypot(groundVx,groundVy)*3.6,1)+' km/h';
+    $('tempStart').textContent=fmt(wind.points[0].temperatureC,2)+' °C';
+    $('tempTop').textContent=fmt(end.temperatureC,2)+' °C';
+    $('cdTop').textContent=end.cd===null?'—':fmt(end.cd,3);
+    $('reTop').textContent=fmt(end.re,0);
+    $('tTopUsed').textContent=fmt(Math.hypot(end.px,end.py),1)+' N';
+    $('suspended').textContent=fmt(wind.suspended,1)+' m';
+    $('onGround').textContent=fmt(wind.ground,1)+' m';
+    $('liftAngle').textContent=fmt(wind.liftAngle,1)+'°';
+    $('groundSpeed').textContent=fmt(Math.abs(groundVx)*3.6,1)+' km/h '+
+      (groundVx>1e-8?'away from winch':groundVx<-1e-8?'toward winch':'stationary');
+    $('climbRate').textContent=fmt(groundVy,2)+' m/s';
+    $('relativeTop').textContent=fmt(end.apparent*3.6,1)+' km/h';
+    $('crossflowTop').textContent=fmt(end.normal,2)+' m/s';
+    $('crossflowEquivalentTop').textContent=fmt(end.normalEquivalent,2)+' m/s ('+fmt(end.normalEquivalent*3.6,1)+' km/h)';
+    drawPath(base.points,wind.points,U>0 || Boolean(motion),wind.ground,airspeedKmh,trueSpeed*3.6);
+    drawLoad(wind.points,L);
+    drawWindSpeed(wind.points,L,U,indicatedAirspeed,trueSpeed);
+    drawTemperature(wind.points,startAltitude);
+    drawDrag(wind.points,startAltitude);
+    drawReynolds(wind.points,startAltitude);
+    $('points').innerHTML=Array.from({length:5},(_,i)=>{
+      const p=wind.points[i*N/4];
+      return '<tr><td>'+fmt(p.s,1)+' m</td><td>'+fmt(p.x,2)+' m</td><td>'+
+        fmt(p.y,2)+' m</td><td>'+fmt(startAltitude+p.y,2)+' m</td><td>'+fmt(p.U,2)+' m/s</td><td>'+fmt(p.apparent,2)+' m/s</td><td>'+fmt(p.normal,2)+' m/s</td><td>'+fmt(p.normalEquivalent,2)+' m/s</td><td>'+fmt(p.temperatureC,2)+' °C</td><td>'+fmt(p.rho,3)+' kg/m³</td><td>'+
+        fmt(p.re,0)+'</td><td>'+(p.cd===null?'—':fmt(p.cd,3))+'</td><td>'+fmt(p.angle,2)+'°</td><td>'+
+        fmt(p.qx,4)+' N/m</td><td>'+fmt(p.fx,1)+' N</td></tr>';
+    }).join('');
+    lastResult={points:wind.points,startAltitude,indicatedAirspeed,trueSpeed,
+      parameters:[['Cable length L (m)',L],['Cable mass (kg/m)',mu],['Maximum upper tension (N)',topTension],['Cable diameter (mm)',diamMm],['Wind speed at upper end (m/s)',U],['Start altitude ASL (m)',startAltitude],['Glider indicated airspeed IAS (km/h)',airspeedKmh],['Glider climb angle through air (°)',climbDegrees]],
+      summary:metrics.map(id=>[$(id).parentElement.querySelector('span').textContent,$(id).textContent])};
+    exports.forEach(id=>$(id).disabled=false);
+  }
+  let redrawTimer;
+  for(const id of ['length','mass','topTension','diameter','wind','startAltitude','airspeed','climbAngle'])
+    $(id).addEventListener('input',()=>{clearTimeout(redrawTimer);redrawTimer=setTimeout(draw,250);});
+  $('downloadReport').addEventListener('click',()=>{if(lastResult)saveFile('hanging_cable_report.html','text/html;charset=utf-8',reportHtml());});
+  $('downloadPath').addEventListener('click',()=>{if(lastResult)downloadPath();});
+  $('downloadData').addEventListener('click',()=>{if(lastResult)downloadData();});
+  draw();
+})();
+</script>
+</body>
+</html>

@@ -179,7 +179,7 @@ IAS. There are two patterns:
 *Optional pilot release.* A pilot who releases at a set rope angle
 (`release_angle` < 180°) ends the launch slightly earlier and lower. For the
 ASK 21 on 1200 m Dyneema with the tension winch, a release at 72°, 76°, 80°,
-85° or 90° gives 481, 483, 484, 486 or 488 m, against 491 m with the
+85° or 90° gives 479, 481, 482, 484 or 486 m, against 489 m with the
 back-release. At 72° the glider is still being pulled (2.0 kN at the hook),
 because the driver has only just started to throttle down; from 80° on the hook
 tension at release is about 0.3 kN or less. The release height depends only a little
@@ -242,13 +242,13 @@ The details:
   differentiation. `eqx.filter_value_and_grad` over the whole `Launch` pytree
   gives the sensitivity to every parameter at once (@sec-sensitivity).
 / Batching: `simulate.solve_batch(launches)` stacks the parameter pytrees and
-  `vmap`s the solve. The six catalogue gliders run as one compiled program: about
+  `vmap`s the solve. The seven catalogue gliders run as one compiled program: about
   5 s the first time (mostly compilation), then about 1 s.
 
 = Example results <sec-results>
 
 *Set-up.* 1200 m rope, no wind, sea level with the standard atmosphere (ISA),
-rope slack 0.2 %, rope modelled with 12 segments of 100 m (the default of 10
+no rope slack, rope modelled with 12 segments of 100 m (the default of 10
 segments per km, `--segments-per-km`). The winch pull is 1.1 × the glider's
 weight. For the tension winch this is the constant pull $F_"max"$. For the
 engine winch (200 kW, 12 kN) the driver sets the throttle so that the pull is
@@ -281,28 +281,31 @@ Other options change the conditions: `--rope-length`, `--wind` (headwind at
       [rope SF],
     ),
     grp[Dyneema, tension winch],
-    [Ka 8], [100], [462], [52.1], [46], [*128*], [64], [3.10], [2.59], [92], [8.7],
-    [ASK 13], [120], [478], [44.9], [52], [*149*], [78], [5.00], [2.81], [173], [5.4],
-    [LS4], [130], [459], [42.8], [69], [*150*], [93], [4.07], [2.96], [124], [6.6],
-    [ASK 21], [150], [491], [46.1], [51], [150], [72], [5.35], [3.18], [181], [5.0],
-    [ASG 29], [150], [467], [40.0], [74], [*157*], [102], [4.75], [2.97], [154], [5.7],
-    [DG-1000], [150], [496], [40.1], [62], [*164*], [95], [6.97], [3.26], [258], [3.9],
+    [Ka 8], [100], [461], [53.5], [52], [*128*], [64], [3.16], [2.56], [88], [8.6],
+    [ASK 13], [120], [476], [46.3], [58], [*148*], [78], [5.10], [2.77], [167], [5.3],
+    [LS4], [130], [457], [44.3], [72], [*149*], [93], [4.18], [2.98], [133], [6.5],
+    [Discus CS], [150], [459], [45.9], [69], [145], [83], [3.82], [2.97], [117], [7.1],
+    [ASK 21], [150], [489], [47.5], [57], [150], [72], [5.50], [3.14], [175], [4.9],
+    [ASG 29], [150], [465], [41.5], [78], [*156*], [102], [4.89], [2.99], [164], [5.5],
+    [DG-1000], [150], [494], [41.6], [67], [*164*], [95], [7.18], [3.23], [256], [3.8],
     table.hline(stroke: 0.3pt),
     grp[Steel, tension winch],
-    [Ka 8], [100], [438], [57.0], [56], [*121*], [64], [3.34], [2.51], [85], [4.5],
-    [ASK 13], [120], [464], [48.8], [59], [*143*], [75], [5.24], [2.71], [162], [3.0],
-    [LS4], [130], [444], [43.5], [81], [*145*], [93], [4.07], [2.96], [129], [3.8],
-    [ASK 21], [150], [474], [50.4], [57], [146], [70], [5.73], [3.09], [170], [3.0],
-    [ASG 29], [150], [454], [40.6], [86], [*153*], [101], [4.72], [3.07], [160], [3.3],
-    [DG-1000], [150], [494], [45.1], [68], [*161*], [75], [7.27], [3.19], [251], [2.3],
+    [Ka 8], [100], [437], [58.7], [61], [*120*], [64], [3.34], [2.47], [80], [5.1],
+    [ASK 13], [120], [463], [50.4], [63], [*143*], [75], [5.13], [2.74], [156], [3.3],
+    [LS4], [130], [443], [45.2], [83], [*144*], [93], [4.07], [2.92], [120], [4.2],
+    [Discus CS], [150], [442], [52.0], [80], [140], [64], [3.75], [2.89], [106], [4.5],
+    [ASK 21], [150], [472], [52.0], [63], [146], [70], [5.55], [3.11], [165], [3.1],
+    [ASG 29], [150], [453], [42.3], [88], [*153*], [101], [4.72], [3.00], [154], [3.6],
+    [DG-1000], [150], [492], [46.7], [73], [*161*], [75], [7.14], [3.23], [239], [2.4],
     table.hline(stroke: 0.3pt),
     grp[Dyneema, engine winch],
-    [Ka 8], [100], [452], [53.6], [70], [*107*], [67], [3.97], [2.33], [68], [6.8],
-    [ASK 13], [120], [448], [47.0], [70], [119], [82], [6.02], [2.26], [136], [4.4],
-    [LS4], [130], [422], [45.0], [95], [124], [96], [4.80], [2.36], [104], [5.6],
-    [ASK 21], [150], [455], [46.2], [64], [121], [88], [6.29], [2.58], [149], [4.3],
-    [ASG 29], [150], [416], [42.3], [104], [130], [103], [5.40], [2.45], [121], [4.9],
-    [DG-1000], [150], [448], [41.9], [80], [132], [105], [8.04], [2.53], [197], [3.3],
+    [Ka 8], [100], [450], [55.0], [67], [*106*], [67], [3.97], [2.33], [78], [6.8],
+    [ASK 13], [120], [446], [48.3], [72], [119], [82], [6.02], [2.21], [124], [4.5],
+    [LS4], [130], [419], [46.4], [105], [121], [96], [4.80], [2.42], [112], [5.6],
+    [Discus CS], [150], [421], [47.5], [99], [120], [93], [4.43], [2.49], [104], [6.1],
+    [ASK 21], [150], [452], [47.6], [71], [122], [89], [6.29], [2.51], [140], [4.3],
+    [ASG 29], [150], [413], [43.7], [114], [128], [103], [5.36], [2.47], [133], [5.0],
+    [DG-1000], [150], [445], [43.3], [85], [133], [105], [8.04], [2.54], [182], [3.4],
   )),
   placement: auto,
   caption: [Launch results for the catalogue gliders, 1200 m rope, no wind.
@@ -317,33 +320,33 @@ Other options change the conditions: `--rope-length`, `--wind` (headwind at
 *Observations.*
 
 - *Height.* On Dyneema with the tension winch the release heights are
-  459–496 m, 38–41 % of the rope length, after 40–52 s.
+  457–494 m, 38–41 % of the rope length, after 42–54 s.
 - *Steel* costs 2–24 m of height (most for the light Ka 8, least for the heavy
-  DG-1000), gives a 6–12 m longer ground run, and lowers the rope safety
+  DG-1000), gives a 5–11 m longer ground run, and lowers the rope safety
   factor: the steel rope is heavier and has a lower breaking load (17 kN
-  against 27 kN). The DG-1000 on steel uses 43 % of the rope's strength.
+  against 27 kN). The DG-1000 on steel uses 42 % of the rope's strength.
 - *Speed.* With the constant pull of the tension winch, the glider accelerates
-  hard in the ground run and the early climb. The speed peaks about 9–11 s
-  after the start, at 34–44 m height, during the rotation into the climb. This
-  peak is above $V_W$ for five of the six gliders: by 28 % for the Ka 8, 24 %
-  for the ASK 13, 15 % for the LS4, 10 % for the DG-1000 and 4 % for the
-  ASG 29; the ASK 21 just reaches its $V_W$. A real driver would set a lower
-  pull for the Ka 8 and open the throttle more gently.
+  hard in the ground run and the early climb. The speed peaks about 11–12 s
+  after the start, at 38–46 m height, during the rotation into the climb. This
+  peak is above $V_W$ for five of the seven gliders: by 28 % for the Ka 8, 23 %
+  for the ASK 13, 15 % for the LS4, 9 % for the DG-1000 and 4 % for the
+  ASG 29. The ASK 21 just reaches its $V_W$, and the Discus CS stays 3 % below
+  it. A real driver would set a lower pull for the Ka 8 and the ASK 13.
 - *Engine winch.* The pull of the power-limited engine winch falls as the reel
-  speeds up, so it limits the speed by itself. The peak speeds (107–132 km/h)
-  and load factors (2.3–2.6) are lower, and only the Ka 8 is still above its
-  $V_W$ (by 7 %). The price is 10–51 m of release height; the fast gliders
+  speeds up, so it limits the speed by itself. The peak speeds (106–133 km/h)
+  and load factors (2.2–2.5) are lower, and only the Ka 8 is still above its
+  $V_W$ (by 6 %). The price is 11–52 m of release height; the fast gliders
   (ASG 29, DG-1000) lose most. The engine pulls harder when the glider slows
-  the rope in the rotation, so the peak hook tension is 14–28 % _higher_ than
+  the rope in the rotation, so the peak hook tension is 10–26 % _higher_ than
   with the tension winch: about 80 % of the weak-link rating for the Ka 8
-  (4.0 of 5 kN) and the DG-1000 (8.0 of 10 kN).
-- *Load factor.* With the tension winch the highest wing load factor, 2.5–3.3,
+  (4.0 of 5 kN), the LS4 (4.8 of 6 kN) and the DG-1000 (8.0 of 10 kN).
+- *Load factor.* With the tension winch the highest wing load factor, 2.6–3.2,
   occurs at 31–34 m height, during the rotation, which the simple pilot flies
   rather briskly.
-- *Top of the launch.* The lowest airspeed (64–105 km/h) is usually reached at
+- *Top of the launch.* The lowest airspeed (64–102 km/h) is usually reached at
   the very end, as the glider slows after the throttle-down. For the Ka 8 this
   is 64 km/h, about 12 % above its 1 g stall speed in the model (57 km/h).
-- *Power.* The ideal tension winch needs up to 258 kW at the drum for the
+- *Power.* The ideal tension winch needs up to 256 kW at the drum for the
   DG-1000, more than the 200 kW of the engine winch.
 
 = Sensitivities of the release height <sec-sensitivity>
@@ -384,29 +387,29 @@ local, linear estimates. `--only rope` restricts the printed table to one group,
       [$Delta h$ (+10 %)],
       [elasticity],
     ),
-    [rope length], [`rope_length`], [1200 m], [0.393 m/m], [+47.2 m], [0.96],
-    [winch pull], [`winch.F_max`], [5.07 kN], [51.1 m/kN], [+25.9 m], [0.53],
-    [winch throttle], [`winch.throttle`], [1], [259 m], [+25.9 m], [0.53],
-    [glider mass], [`glider.mass`], [470 kg], [−0.48 m/kg], [−22.6 m], [−0.46],
-    [gravity], [`env.g`], [9.81 m/s²], [−22.7 m/(m/s²)], [−22.3 m], [−0.45],
+    [rope length], [`rope_length`], [1200 m], [0.394 m/m], [+47.2 m], [0.97],
+    [winch pull], [`winch.F_max`], [5.07 kN], [50.5 m/kN], [+25.6 m], [0.52],
+    [winch throttle], [`winch.throttle`], [1], [256 m], [+25.6 m], [0.52],
+    [glider mass], [`glider.mass`], [470 kg], [−0.48 m/kg], [−22.5 m], [−0.46],
+    [gravity], [`env.g`], [9.81 m/s²], [−22.6 m/(m/s²)], [−22.2 m], [−0.45],
     [end of nose lowering], [`pilot.top_beta1`], [70°], [1.08 m/deg], [+7.6 m], [0.15],
-    [climb attitude], [`pilot.theta_climb`], [40°], [1.52 m/deg], [+6.1 m], [0.12],
-    [target climb speed], [`pilot.V_target`], [105 km/h], [−0.57 m/(km/h)], [−6.0 m], [−0.12],
-    [start of nose lowering], [`pilot.top_beta0`], [55°], [0.82 m/deg], [+4.5 m], [0.09],
-    [back-release angle], [`pilot.back_release_angle`], [110°], [0.38 m/deg], [+4.2 m], [0.08],
+    [climb attitude], [`pilot.theta_climb`], [40°], [1.51 m/deg], [+6.0 m], [0.12],
+    [target climb speed], [`pilot.V_target`], [105 km/h], [−0.55 m/(km/h)], [−5.8 m], [−0.12],
+    [start of nose lowering], [`pilot.top_beta0`], [55°], [0.81 m/deg], [+4.5 m], [0.09],
+    [back-release angle], [`pilot.back_release_angle`], [110°], [0.38 m/deg], [+4.2 m], [0.09],
     [rope diameter], [`rope.diameter`], [5 mm], [−6.8 m/mm], [−3.4 m], [−0.07],
-    [rope normal drag coeff.], [`rope.CDn`], [1.2], [−28 m], [−3.4 m], [−0.07],
+    [rope normal drag coeff.], [`rope.CDn`], [1.2], [−28 m], [−3.3 m], [−0.07],
   )),
   caption: [The 12 largest sensitivities: ASK 21, 1200 m Dyneema, tension winch
-    ($h = 491$ m). `uv run main.py --gliders "ASK 21" --top 12`.],
+    ($h = 489$ m). `uv run main.py --gliders "ASK 21" --top 12`.],
 ) <tab-sensitivity>
 
 *What the table shows.*
 
 - The rope length matters most. The height is almost proportional to it
-  (elasticity 0.96): +120 m of rope gives +47 m of height.
+  (elasticity 0.97): +120 m of rope gives +47 m of height.
 - Next come the winch pull and the glider's weight, with about equal and
-  opposite effect (+0.53 and −0.46): what counts is the pull per weight.
+  opposite effect (+0.52 and −0.46): what counts is the pull per weight.
   `winch.F_max` and `winch.throttle` give the same row because the pull is
   their product, and `env.g` acts through the weight.
 - Then the pilot. How late the pilot lowers the nose at the top
@@ -415,10 +418,10 @@ local, linear estimates. `--only rope` restricts the printed table to one group,
   back-release trips. These control-law parameters matter more than any single
   aerodynamic parameter of the glider: the largest, the wing area, comes next
   with +3.1 m for +10 %.
-- Rope drag (diameter and normal drag coefficient) costs about 3.4 m each for
-  +10 %.
+- Rope drag (diameter and normal drag coefficient) costs about 3.3–3.4 m each
+  for +10 %.
 - The driver's throttle-down angles have small effects: moving the start from
-  65° to 71.5° (+10 %) costs 2.0 m.
+  65° to 71.5° (+10 %) costs 2.1 m.
 
 Parameters whose default value is zero have zero elasticity and so do not
 appear at the top, although their derivative can be large. The most important
@@ -428,14 +431,14 @@ at 10 m height. Another is the throttle floor after the throttle-down
 estimate).
 
 *The rope.* For the steel rope with the ASK 13 (`--rope steel --only rope`,
-$h = 464$ m) the rope properties change the height by, for +10 %: diameter
-−2.4 m, normal drag coefficient `CDn` −2.3 m, mass per length −1.5 m,
+$h = 463$ m) the rope properties change the height by, for +10 %: diameter
+−2.4 m, normal drag coefficient `CDn` −2.3 m, mass per length −1.4 m,
 parachute drag area −0.5 m, ground friction −0.4 m, rope-end mass −0.4 m,
 tangential friction `Cf` −0.1 m. Rope drag and rope weight thus matter about
 equally, with drag somewhat ahead. For the much lighter Dyneema rope the weight
 hardly matters (−0.2 m for +10 % on the ASK 21). The axial stiffness $E A$ has
 essentially _no_ influence on the release height: +10 % changes it by about
-1.5 cm. Rope stretch shapes the tension oscillations in the ground run
+1 cm. Rope stretch shapes the tension oscillations in the ground run
 (@sec-rope), not the energy that reaches the glider.
 
 = Limitations and possible extensions <sec-limits>

@@ -23,7 +23,7 @@ def _launch(name="ASK 21", rope=DYNEEMA, winch="tension", **kw):
     g, p = CATALOGUE[name]
     w = tension_winch(g) if winch == "tension" else engine_winch(g)
     return Launch(
-        glider=g, rope=rope, winch=w, pilot=p, env=ENV, rope_length=1200.0, slack=0.002
+        glider=g, rope=rope, winch=w, pilot=p, env=ENV, rope_length=1200.0, slack=0.0
     )
 
 
@@ -214,7 +214,7 @@ def test_weak_link_breaks_on_excessive_pull():
         pilot=p,
         env=ENV,
         rope_length=1200.0,
-        slack=0.002,
+        slack=0.0,
     )
     s = summarize(L, solve_launch(L, n_segments=12))
     assert s["event"] == "weak_link"
@@ -276,7 +276,7 @@ def test_rope_too_heavy_to_drag_ends_with_no_liftoff():
         pilot=p,
         env=ENV,
         rope_length=1200.0,
-        slack=0.002,
+        slack=0.0,
     )
     s = summarize(L, solve_launch(L, n_segments=12))
     assert s["event"] == "no_liftoff"

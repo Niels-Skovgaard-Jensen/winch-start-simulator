@@ -11,9 +11,9 @@ most for the release height. The equations are in the sections that follow.
 == A winch launch in brief
 
 At the start the glider rests tail-down on its main wheel and tail skid. The
-rope lies straight along the runway between the winch and the hook, almost taut
-(0.2 % slack by default). After one second the winch driver opens the throttle
-over three seconds. The rope tightens and stretches, and the glider accelerates.
+rope lies straight along the runway between the winch and the hook, just taut:
+the driver has taken up the slack. After one second the winch driver opens the
+throttle over six seconds. The rope stretches, and the glider accelerates.
 The rope that is still on the grass is dragged along with it, which costs some
 of the pull.
 
@@ -156,17 +156,17 @@ approximations. See @sec-limits for more.
 The simulator computes the gradient of the release height with respect to every
 parameter (@sec-sensitivity). @tab-ov-sens shows the largest ones for the
 default launch: ASK 21, 1200 m Dyneema rope, tension winch, no wind. The
-release height is 491 m.
+release height is 489 m.
 
 #figure(
   booktab(
     columns: (1fr, auto, auto),
     align: (left, right, right),
     ([parameter (default)], [$Delta h$ for +10 %], [elasticity]),
-    [rope length (1200 m)], [+47 m], [0.96],
-    [winch pull (1.1 × weight)], [+26 m], [0.53],
-    [glider mass (470 kg)], [−23 m], [−0.46],
-    [pilot: $beta$ where nose-lowering ends (70°)], [+8 m], [0.16],
+    [rope length (1200 m)], [+47 m], [0.97],
+    [winch pull (1.1 × weight)], [+26 m], [0.52],
+    [glider mass (470 kg)], [−22 m], [−0.46],
+    [pilot: $beta$ where nose-lowering ends (70°)], [+8 m], [0.15],
     [pilot: climb attitude (40°)], [+6 m], [0.12],
     [pilot: target speed (105 km/h IAS)], [−6 m], [−0.12],
     [pilot: $beta$ where nose-lowering starts (55°)], [+4 m], [0.09],
@@ -176,7 +176,7 @@ release height is 491 m.
     [wing area (17.95 m²)], [+3 m], [0.06],
   ),
   caption: [Largest sensitivities of the release height; ASK 21, 1200 m
-    Dyneema, tension winch ($h = 491$ m). Elasticity: % change in height per %
+    Dyneema, tension winch ($h = 489$ m). Elasticity: % change in height per %
     change in the parameter. Local values; each parameter is changed on its
     own.],
 ) <tab-ov-sens>

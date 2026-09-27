@@ -44,7 +44,10 @@ def _defaults(**kw) -> dict:
     d = {
         "b_fric": 20.0,
         "t_start": 1.0,
-        "t_ramp": 3.0,
+        # The driver opens the throttle gradually: measured tension builds up over
+        # ~7 s (data/tensiometer).  A ramp much shorter than the ~3-6 s period of
+        # the drum-rope-glider oscillation snatches the glider and makes it ring.
+        "t_ramp": 6.0,
         # The driver throttles right down as the glider passes ~65-70 deg elevation;
         # the rope goes slack and the hook's back-release trips.
         "fade_beta0": jnp.deg2rad(65.0),

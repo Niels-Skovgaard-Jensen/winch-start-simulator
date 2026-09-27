@@ -146,7 +146,7 @@ def main() -> None:
                     isa_dT=a.isa_dt,
                 ),
                 rope_length=a.rope_length,
-                slack=0.002,
+                slack=0.0,
             )
         )
 

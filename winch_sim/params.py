@@ -177,4 +177,6 @@ class Launch(eqx.Module):
     pilot: Pilot
     env: Env
     rope_length: float | Array = unit("m")  # length of rope laid out on the runway
-    slack: float | Array = unit("-")  # relative slack in the laid-out rope
+    slack: float | Array = unit(
+        "-"
+    )  # relative slack in the laid-out rope (0: taken up)

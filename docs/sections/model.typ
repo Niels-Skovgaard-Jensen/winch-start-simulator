@@ -63,8 +63,11 @@ nodes simpler.
 
 *Initial state.* The glider stands still on its main wheel and tail skid, tail
 down. The rope lies straight on the runway between the hook and the winch. Its
-unstretched length is the distance between the two ends plus 0.2 % slack
-(`Launch.slack` = 0.002), so at $t = 0$ it carries no tension.
+unstretched length is the distance between the two ends times $1 + s$, with the
+relative slack $s$ = `Launch.slack`. The default $s = 0$ starts the launch
+after the driver has taken up the slack: the rope is just taut and carries no
+tension. With slack the drum spins up freely until the rope comes taut, and then
+snatches the glider.
 
 = Glider rigid body <sec-glider>
 
@@ -635,9 +638,16 @@ $
   quad beta = op("atan2")(z - z_w, x_w - x)
 $ <m-eq-throttle>
 
-with $S$ the smoothstep, $t_0 = 1$ s, $t_r = 3$ s, $beta_0 = 65°$,
+with $S$ the smoothstep, $t_0 = 1$ s, $t_r = 6$ s, $beta_0 = 65°$,
 $beta_1 = 70°$, $f = 0$ (`Winch.t_start`, `t_ramp`, `fade_beta0`,
-`fade_beta1`, `fade_floor`), and $(x, z)$ the glider's CG. The drum stops
+`fade_beta1`, `fade_floor`), and $(x, z)$ the glider's CG. The ramp time
+follows tensiometer logs of real launches (`data/tensiometer`), in which the
+rope tension builds up over about 7 s. A much shorter ramp, or slack in the
+rope, lets the drum spin up before the glider moves. The drum then snatches the
+glider, and drum, rope and glider oscillate. With a 3 s ramp and 0.2 % slack,
+the hook tension of an ASK 13 on 1050 m of Dyneema (engine winch) swung between
+1 and 6 kN in the ground run. The logs show a first peak of about 2.3 kN. At
+the top the drum stops
 pulling, the rope slackens and its weight (plus the parachute drag) pulls the
 rope end down and back. The glider flies on over the rope end until the rope
 pulls from far behind and the hook's back-release trips (@sec-events). After

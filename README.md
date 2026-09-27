@@ -31,12 +31,12 @@ typst compile docs/physics.typ    # -> docs/physics.pdf
 
 ## Example results
 
-Six gliders on 1200 m of Dyneema with a power-limited engine winch
+Seven gliders on 1200 m of Dyneema with a power-limited engine winch
 (`uv run main.py --winch engine`). Every launch ends the usual way: the winch
 driver throttles down near the top, the rope goes slack and the tow hook's
 back-release opens.
 
-![Comparison of six gliders](docs/images/compare_gliders.png)
+![Comparison of seven gliders](docs/images/compare_gliders.png)
 
 One launch in detail (ASK 21, tension winch): rope shapes during the climb,
 tension at the winch and at the hook, speeds, angles, winch power and the pilot's
@@ -55,16 +55,16 @@ diameter), the height change for +10 %, and the *elasticity* (% height per %
 parameter). The table is sorted by elasticity. These are local values: for big
 changes, such as steel vs Dyneema, run the simulation instead.
 
-ASK 21, 1200 m Dyneema, tension winch (h = 491 m), largest effects:
+ASK 21, 1200 m Dyneema, tension winch (h = 489 m), largest effects:
 
 | parameter | ∂h/∂p | Δh for +10 % | elasticity |
 |---|---|---|---|
-| rope length (1200 m) | 0.39 m/m | +47 m | 0.96 |
-| winch pull (5.07 kN) | 51 m/kN | +26 m | 0.53 |
-| glider mass (470 kg) | −0.48 m/kg | −23 m | −0.46 |
+| rope length (1200 m) | 0.39 m/m | +47 m | 0.97 |
+| winch pull (5.07 kN) | 50 m/kN | +26 m | 0.52 |
+| glider mass (470 kg) | −0.48 m/kg | −22 m | −0.46 |
 | pilot: end of nose lowering (70°) | 1.1 m/deg | +8 m | 0.15 |
 | pilot: climb attitude (40°) | 1.5 m/deg | +6 m | 0.12 |
-| pilot: target climb speed (105 km/h) | −0.57 m/(km/h) | −6 m | −0.12 |
+| pilot: target climb speed (105 km/h) | −0.55 m/(km/h) | −6 m | −0.12 |
 | rope diameter (5 mm) | −6.8 m/mm | −3 m | −0.07 |
 | rope drag coefficient (1.2) | −28 m | −3 m | −0.07 |
 
@@ -96,12 +96,12 @@ uv run main.py --gliders "Discus CS" "ASK 13" --rope-length 1050 --winch engine 
 
 *Thin lines: the five measured launches, lined up at release with the Discus CS.
 As with the power-limited engine winch, the measured tension builds up during the
-climb while the reel speed falls. With the default winch setting (pull 1.1 ×
-weight at 15 m/s) the simulation pulls harder than the winch did that day: 5.0 kN
-at the top for the Discus CS (3.8 to 4.3 kN measured) and 6.6 kN for the ASK 13
-(5.0 to 5.7 kN measured). The simulated start is also much harsher. The default
-0.2 % slack and 3 s throttle ramp snatch the glider, while the measured tension
-builds up over about 7 s.*
+climb while the reel speed falls. The default start follows these logs: the rope
+has no slack (the driver has taken it up) and the throttle opens over 6 s. The
+measured tension builds up over about 7 s. With the default winch setting (pull
+1.1 × weight at 15 m/s) the simulation pulls harder than the winch did that day.
+In the climb it reaches 4.6 kN for the Discus CS (3.8 to 4.3 kN measured) and
+6.6 kN for the ASK 13 (5.0 to 5.7 kN measured).*
 
 ## Desktop app
 
@@ -140,7 +140,7 @@ A Qt (PySide6) window with:
 ![Rope & glider view of the desktop app](docs/images/gui_rope_view.png)
 
 *Rope & glider view: a Ka 8 with the winch pulling 2.2 × its weight. The weak
-link breaks during the ground run, and the banner shows why.*
+link breaks just after lift-off, and the banner shows why.*
 
 ## Usage
 
@@ -180,7 +180,7 @@ launch = Launch(
     pilot=pilot,
     env=Env(wind_ref=3.0),
     rope_length=1200.0,
-    slack=0.002,
+    slack=0.0,
 )
 sol = solve_launch(launch, n_segments=12)
 print(summarize(launch, sol))

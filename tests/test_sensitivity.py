@@ -31,7 +31,7 @@ def launch():
             pilot=p,
             env=Env(),
             rope_length=1200.0,
-            slack=0.002,
+            slack=0.0,
         )
     )
 
@@ -57,7 +57,7 @@ def test_gradient_matches_finite_differences(launch, path):
         return dataclasses.replace(launch, **{parts[0]: sub})
 
     v = get(launch)
-    dv = 1e-3 * abs(v)
+    dv = 3e-4 * abs(v)  # h(rope.mu) is curved: a 1e-3 step is ~1 % off
     kw = {"rtol": 1e-9, "atol": 1e-9, "max_steps": 200_000}
     fd = (
         release_height(with_value(v + dv), **kw)
