@@ -36,7 +36,7 @@ from ..simulate import (
     summarize,
     time_series,
 )
-from ..winch import tension_winch
+from ..winch import engine_winch
 
 CACHE_DIR = Path.home() / ".cache" / "winch_sim" / "jax"
 
@@ -70,7 +70,7 @@ def default_launch(glider="ASK 21", rope="dyneema") -> Launch:
     return Launch(
         glider=g,
         rope=ROPES[rope],
-        winch=tension_winch(g),
+        winch=engine_winch(g),
         pilot=p,
         env=Env(),
         rope_length=1200.0,

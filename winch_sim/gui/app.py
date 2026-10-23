@@ -35,7 +35,7 @@ from .worker import (  # noqa: F401  (run_launch re-exported for scripts/tests)
     run_launch,
 )
 
-WINCH_PRESETS = ("tension", "engine")
+WINCH_PRESETS = ("engine","tension") 
 MEASURED_DIR = Path("data/tensiometer")  # example logs, see data/tensiometer/README.md
 MEASURED_HEADS = (
     "show",

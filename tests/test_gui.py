@@ -15,6 +15,7 @@ from winch_sim.gui.app import (
     release_info,
     run_launch,
 )
+from winch_sim.winch import engine_winch
 
 
 @pytest.fixture(scope="module")
@@ -41,11 +42,20 @@ def test_forms_reproduce_the_default_launch(window):
 
 
 def test_preset_changes_glider_and_rescales_winch(window):
-    window.glider_combo.setCurrentText("Ka 8")
-    L = window.current_launch()
-    assert float(L.glider.mass) == 290.0
-    assert float(L.winch.F_max) == pytest.approx(1.1 * 290.0 * 9.81)
-    window.glider_combo.setCurrentText("ASK 21")
+    try:
+        window.glider_combo.setCurrentText("Ka 8")
+        L = window.current_launch()
+        assert float(L.glider.mass) == 290.0
+        # the engine winch (default) keeps its curve and throttles to the weight
+        ref = engine_winch(L.glider, pull_per_weight=1.1)
+        assert float(L.winch.F_max) == pytest.approx(float(ref.F_max))
+        assert float(L.winch.throttle) == pytest.approx(float(ref.throttle))
+        window.winch_combo.setCurrentText("tension")
+        L = window.current_launch()
+        assert float(L.winch.F_max) == pytest.approx(1.1 * 290.0 * 9.81)
+    finally:
+        window.winch_combo.setCurrentText("engine")
+        window.glider_combo.setCurrentText("ASK 21")
 
 
 def test_run_and_settings_roundtrip(window):
