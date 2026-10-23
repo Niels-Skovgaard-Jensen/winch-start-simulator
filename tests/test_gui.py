@@ -169,3 +169,24 @@ def test_import_measured_tension(window, tmp_path):
     window.rope_combo.setCurrentText("dyneema")
     window.winch_combo.setCurrentText("tension")
     window.set_launch(default_launch())
+
+
+def test_export_series_with_rope_positions(window, tmp_path, monkeypatch):
+    if not window.runs:
+        window.add_run(
+            run_launch("e", window.current_launch(), Numerics(sensitivity=False))
+        )
+    window.runs_table.selectRow(0)
+    fn = tmp_path / "launch.csv"
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getSaveFileName", lambda *a, **k: (str(fn), "")
+    )
+    series = window.runs[0].series
+    for rope in (False, True):
+        window.export_rope.setChecked(rope)
+        window._export_series()
+        head = fn.read_text().splitlines()[0].split(",")
+        assert ("rope_x_0" in head) == rope
+    assert f"rope_z_{series['rope_z'].shape[1] - 1}" in head
+    data = np.loadtxt(fn, delimiter=",", skiprows=1)
+    np.testing.assert_allclose(data[:, head.index("rope_x_0")], series["rope_x"][:, 0])

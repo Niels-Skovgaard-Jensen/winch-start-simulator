@@ -3,6 +3,8 @@
 import csv
 from pathlib import Path
 
+import numpy as np
+
 from .sensitivity import sensitivity_unit
 
 # (summary key, header, format spec, scale)
@@ -20,6 +22,29 @@ COLUMNS = [
     ("max_power_kW", "P max kW", ".0f", 1.0),
     ("rope_safety_factor", "rope SF", ".1f", 1.0),
 ]
+
+
+def write_series_csv(fn: Path | str, series: dict, rope: bool = False) -> None:
+    """Time series (SI units) as CSV, one row per save point.
+
+    With `rope`, the rope node positions follow as columns rope_x_0 ... rope_x_N,
+    rope_z_0 ... rope_z_N (node 0 at the winch, node N at the hook, or the free rope
+    end after release).  That adds two columns per node, often doubling the file.
+    """
+    keys = [k for k, v in series.items() if np.ndim(v) == 1]
+    cols = [series[k] for k in keys]
+    if rope:
+        for k in ("rope_x", "rope_z"):
+            nodes = np.asarray(series[k])
+            keys += [f"{k}_{j}" for j in range(nodes.shape[1])]
+            cols += list(nodes.T)
+    np.savetxt(
+        fn,
+        np.column_stack(cols),
+        delimiter=",",
+        header=",".join(keys),
+        comments="",
+    )
 
 
 def write_sensitivity_csv(fn: Path | str, rows) -> None:

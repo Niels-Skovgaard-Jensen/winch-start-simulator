@@ -124,7 +124,9 @@ A Qt (PySide6) window with:
   settings change, not when physical values change.
 * **results:**
   * *Runs*: summary table of all runs; tick runs to compare them, reload a run's
-    settings, export a time series as CSV.
+    settings, export a time series as CSV (tick *export rope positions* to add the
+    x, z of every rope node as columns `rope_x_0 …`, `rope_z_0 …`, node 0 at the
+    winch; two columns per node, so this often doubles the file).
   * *Measured*: imported tensiometer launches (File → Import measured tension,
     Ctrl+I; a log with several launches gives one row each), with the detected
     start of the pull and release. Ticked launches are drawn over the hook tension

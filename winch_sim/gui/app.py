@@ -22,7 +22,7 @@ from ..cable import ROPES, load_rope
 from ..gliders import CATALOGUE
 from ..measured import ALIGN_MODES, Measurement, load_launches, traces
 from ..params import Env, Glider, Launch, Pilot, Rope, Winch
-from ..report import COLUMNS, write_sensitivity_csv
+from ..report import COLUMNS, write_sensitivity_csv, write_series_csv
 from ..sensitivity import sensitivity_unit
 from ..winch import engine_winch, tension_winch
 from .forms import FloatEdit, ModuleForm, scrolled
@@ -538,6 +538,12 @@ class MainWindow(QtWidgets.QMainWindow):
             b = QtWidgets.QPushButton(text)
             b.clicked.connect(slot)
             btns.addWidget(b)
+        self.export_rope = QtWidgets.QCheckBox("export rope positions")
+        self.export_rope.setToolTip(
+            "add the x, z of every rope node to the exported time series "
+            "(two columns per node, often doubles the file)"
+        )
+        btns.addWidget(self.export_rope)
         btns.addStretch(1)
         rl.addLayout(btns)
         self.results.addTab(runs, "Runs")
@@ -1022,16 +1028,10 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if not fn:
             return
-        s = self.runs[i].series
-        keys = [k for k, v in s.items() if np.ndim(v) == 1]
-        np.savetxt(
-            fn,
-            np.column_stack([s[k] for k in keys]),
-            delimiter=",",
-            header=",".join(keys),
-            comments="",
-        )
-        self.statusBar().showMessage(f"time series (SI units) written to {fn}")
+        rope = self.export_rope.isChecked()
+        write_series_csv(fn, self.runs[i].series, rope=rope)
+        what = "time series with rope positions" if rope else "time series"
+        self.statusBar().showMessage(f"{what} (SI units) written to {fn}")
 
     def _remove_selected(self):
         i = self._selected_row()
