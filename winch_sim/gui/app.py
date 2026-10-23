@@ -35,7 +35,7 @@ from .worker import (  # noqa: F401  (run_launch re-exported for scripts/tests)
     run_launch,
 )
 
-WINCH_PRESETS = ("engine","tension") 
+WINCH_PRESETS = ("engine", "tension")
 MEASURED_DIR = Path("data/tensiometer")  # example logs, see data/tensiometer/README.md
 MEASURED_HEADS = (
     "show",
@@ -538,14 +538,38 @@ class MainWindow(QtWidgets.QMainWindow):
             b = QtWidgets.QPushButton(text)
             b.clicked.connect(slot)
             btns.addWidget(b)
+        btns.addStretch(1)
+        rl.addLayout(btns)
+        opts = QtWidgets.QHBoxLayout()
         self.export_rope = QtWidgets.QCheckBox("export rope positions")
         self.export_rope.setToolTip(
             "add the x, z of every rope node to the exported time series "
             "(two columns per node, often doubles the file)"
         )
-        btns.addWidget(self.export_rope)
-        btns.addStretch(1)
-        rl.addLayout(btns)
+        self.export_sampling = QtWidgets.QComboBox()
+        self.export_sampling.addItems(
+            ["as simulated", "fixed time step", "fixed number of points"]
+        )
+        self.export_sampling.setToolTip(
+            "export the save points of the simulation, or interpolate them "
+            "linearly onto evenly spaced times"
+        )
+        self.export_dt = FloatEdit()
+        self.export_dt.set_value(0.1)
+        self.export_dt.setToolTip("time step of the exported series [s]")
+        self.export_n = QtWidgets.QSpinBox()
+        self.export_n.setRange(2, 10_000_000)
+        self.export_n.setValue(1000)
+        self.export_n.setToolTip("number of exported points, both ends included")
+        self.export_sampling.currentIndexChanged.connect(self._export_sampling_changed)
+        self._export_sampling_changed()
+        opts.addWidget(QtWidgets.QLabel("export:"))
+        opts.addWidget(self.export_rope)
+        opts.addWidget(self.export_sampling)
+        opts.addWidget(self.export_dt)
+        opts.addWidget(self.export_n)
+        opts.addStretch(1)
+        rl.addLayout(opts)
         self.results.addTab(runs, "Runs")
         self.measured_tab = self._measured_tab()
         self.results.addTab(self.measured_tab, "Measured")
@@ -1019,18 +1043,36 @@ class MainWindow(QtWidgets.QMainWindow):
             self.num_form.set(self.runs[i].numerics)
             self.statusBar().showMessage(f"settings of {self.runs[i].name} loaded")
 
+    def _export_sampling_changed(self):
+        mode = self.export_sampling.currentIndex()
+        self.export_dt.setVisible(mode == 1)
+        self.export_n.setVisible(mode == 2)
+
     def _export_series(self):
         i = self._selected_row()
         if i is None:
             return
+        mode = self.export_sampling.currentIndex()
+        dt = n = None
+        if mode == 1:
+            if not self.export_dt.is_valid() or self.export_dt.value() <= 0:
+                self.statusBar().showMessage("export time step must be positive")
+                return
+            dt = self.export_dt.value()
+        elif mode == 2:
+            n = self.export_n.value()
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, "Export time series", "launch.csv", "CSV (*.csv)"
         )
         if not fn:
             return
         rope = self.export_rope.isChecked()
-        write_series_csv(fn, self.runs[i].series, rope=rope)
+        write_series_csv(fn, self.runs[i].series, rope=rope, dt=dt, n=n)
         what = "time series with rope positions" if rope else "time series"
+        if dt is not None:
+            what += f" every {dt:g} s"
+        elif n is not None:
+            what += f" at {n} points"
         self.statusBar().showMessage(f"{what} (SI units) written to {fn}")
 
     def _remove_selected(self):

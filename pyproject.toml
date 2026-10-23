@@ -9,6 +9,7 @@ dependencies = [
     "jax>=0.11.2",
     "matplotlib>=3.11.2",
     "pyside6>=6.11.2",
+    "scipy>=1.18.1",
 ]
 
 [project.scripts]

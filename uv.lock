@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [[package]]
@@ -762,6 +762,7 @@ dependencies = [
     { name = "jax" },
     { name = "matplotlib" },
     { name = "pyside6" },
+    { name = "scipy" },
 ]
 
 [package.dev-dependencies]
@@ -777,6 +778,7 @@ requires-dist = [
     { name = "jax", specifier = ">=0.11.2" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "pyside6", specifier = ">=6.11.2" },
+    { name = "scipy", specifier = ">=1.18.1" },
 ]
 
 [package.metadata.requires-dev]

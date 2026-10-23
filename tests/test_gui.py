@@ -200,3 +200,27 @@ def test_export_series_with_rope_positions(window, tmp_path, monkeypatch):
     assert f"rope_z_{series['rope_z'].shape[1] - 1}" in head
     data = np.loadtxt(fn, delimiter=",", skiprows=1)
     np.testing.assert_allclose(data[:, head.index("rope_x_0")], series["rope_x"][:, 0])
+
+
+def test_export_series_resampled(window, tmp_path, monkeypatch):
+    if not window.runs:
+        window.add_run(
+            run_launch("e", window.current_launch(), Numerics(sensitivity=False))
+        )
+    window.runs_table.selectRow(0)
+    fn = tmp_path / "launch.csv"
+    monkeypatch.setattr(
+        QtWidgets.QFileDialog, "getSaveFileName", lambda *a, **k: (str(fn), "")
+    )
+    window.export_rope.setChecked(False)
+    window.export_sampling.setCurrentIndex(1)
+    window.export_dt.set_value(0.25)
+    window._export_series()
+    head = fn.read_text().splitlines()[0].split(",")
+    t = np.loadtxt(fn, delimiter=",", skiprows=1)[:, head.index("t")]
+    np.testing.assert_allclose(np.diff(t), 0.25)
+    window.export_sampling.setCurrentIndex(2)
+    window.export_n.setValue(123)
+    window._export_series()
+    assert np.loadtxt(fn, delimiter=",", skiprows=1).shape[0] == 123
+    window.export_sampling.setCurrentIndex(0)
